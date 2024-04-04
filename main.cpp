@@ -7,10 +7,6 @@ SDL_Window *window;
 SDL_Surface *winSurface;
 SDL_Surface *pacman_bitmap;
 
-Uint32 band_color;
-
-Uint32 road_color;
-
 
 const int WINDOW_WIDTH = 640; // *64
 
@@ -23,6 +19,15 @@ const int BOARD_START = BOARD_SCORE_HEIGHT;
 const int BAND_WIDTH = 5;
 
 const int BAND_HEIGHT = 60;
+
+struct Pacman {
+    int y;
+    int x;
+};
+
+enum coordinates {
+    WIDTH, HEIGHT
+};
 
 struct Cell {
     int y;
@@ -44,15 +49,17 @@ bool compareByHeight(const CellRoad &a, const CellRoad &b);
 
 bool compareByWidth(const CellRoad &a, const CellRoad &b);
 
-bool printBoard(SDL_Rect *rects, int count);
-
-bool printRoad(SDL_Rect *rectsRoad, int count);
+bool printBoard(SDL_Rect *rects, int count, Uint8 r, Uint8 g, Uint8 b);
 
 void generateBoard(SDL_Rect *rectsBoard);
 
-void generateRoad(SDL_Rect *rectsBoard, SDL_Rect *rectsRoad, int length, std::vector<CellRoad> &cellsRoad);
+std::vector<CellRoad> generateRoad(SDL_Rect *rectsBoard, int length);
 
 void x_axis_Board(SDL_Rect *rectsBoardRight, SDL_Rect *rectsBoardLeft, int length);
+
+int changeRender(Pacman pacman, coordinates c);
+
+Pacman tunnelSwap(Pacman &pacman);
 
 bool load();
 
@@ -67,43 +74,26 @@ int main(int argc, char *args[]) {
 
     if (!load()) return 1;
 
-    SDL_Rect pacman;
-    pacman.x = 319/*WINDOW_WIDTH / 2*/;
-    pacman.y = 380/*WINDOW_HEIGHT / 2 - BOARD_SCORE_HEIGHT + BAND_HEIGHT + BAND_HEIGHT / 2*/;
-    pacman.w = 30;
-    pacman.h = 30;
+    Pacman pacman = Pacman();
+    pacman.x = 319;
+    pacman.y = 380;
+
+    SDL_Rect pacmanRender;
+    pacmanRender.w = 30;
+    pacmanRender.h = 30;
 
     SDL_Rect bounds_coordinatesRight[33];
     SDL_Rect bounds_coordinatesLeft[33];
 
-    SDL_Rect road_coordinates[66];
-
     std::vector<CellRoad> road;
-
-    band_color = SDL_MapRGB(winSurface->format, 0, 0, 255);
-    road_color = SDL_MapRGB(winSurface->format, 210, 4, 45);
 
     generateBoard(bounds_coordinatesRight);
     x_axis_Board(bounds_coordinatesRight, bounds_coordinatesLeft, 33);
-    generateRoad(bounds_coordinatesRight, road_coordinates, 33, road);
 
+    road = generateRoad(bounds_coordinatesRight, 33);
     road = joinElements(road);
     road = x_axis_Road(road);
 
-    int count = 0;
-
-    for (auto cell: road) {
-        road_coordinates[count].x = cell.x;
-        road_coordinates[count].y = cell.y;
-        if (cell.w > 0) {
-            road_coordinates[count].w = cell.w;
-            road_coordinates[count].h = BAND_WIDTH;
-        } else {
-            road_coordinates[count].h = cell.h;
-            road_coordinates[count].w = BAND_WIDTH;
-        }
-        count++;
-    }
 
     int direction = 0, next_direction = 0;
     int state = 0;
@@ -286,14 +276,19 @@ int main(int argc, char *args[]) {
             direction = next_direction;
         }
 
+        pacman = tunnelSwap(pacman);
+
+        pacmanRender.x = changeRender(pacman, WIDTH);
+        pacmanRender.y = changeRender(pacman, HEIGHT);
+
 
         SDL_Delay(10);
-        SDL_BlitSurface(pacman_bitmap, NULL, winSurface, &pacman);
-        if (!printBoard(bounds_coordinatesRight, 33)) return -1;
-        if (!printBoard(bounds_coordinatesLeft, 33)) return -1;
-        if (!printRoad(road_coordinates, 66)) return -1;
+        SDL_BlitSurface(pacman_bitmap, NULL, winSurface, &pacmanRender);
+        if (!printBoard(bounds_coordinatesRight, 33, 0, 0, 255)) return -1;
+        if (!printBoard(bounds_coordinatesLeft, 33, 0, 0, 255)) return -1;
         SDL_UpdateWindowSurface(window);
     }
+
     system("pause");
     kill();
     return 0;
@@ -414,26 +409,6 @@ std::vector<CellRoad> joinElements(std::vector<CellRoad> cellRoad) {
         ++count;
     }
 
-    /*count = 0;
-
-    for (auto cell: sortedWidthRoad) {
-        cout << "----" << count << "----\n";
-        cout << "X: " << cell.x << "\n";
-        cout << "Y: " << cell.y << "\n";
-        cout << "W: " << cell.w << "\n";
-        count++;
-    }
-
-    count = 0;
-
-    for (auto cell: sortedHeightRoad) {
-        cout << "----" << count << "----\n";
-        cout << "X: " << cell.x << "\n";
-        cout << "Y: " << cell.y << "\n";
-        cout << "H: " << cell.h << "\n";
-        count++;
-    }*/
-
     for (auto cell: sortedHeightRoad) {
         sortedWidthRoad.push_back(cell);
     }
@@ -487,6 +462,214 @@ std::vector<CellRoad> x_axis_Road(std::vector<CellRoad> cellRoad) {
     return axisCellRoad;
 }
 
+std::vector<CellRoad> generateRoad(SDL_Rect *rectsBoard, int length) {
+    using namespace std;
+
+    vector<CellRoad> road;
+
+    for (int i = 0; i < length; ++i) {
+        CellRoad roadElement;
+        roadElement.x = rectsBoard[i].x;
+        roadElement.y = rectsBoard[i].y;
+        roadElement.w = rectsBoard[i].w;
+        roadElement.h = rectsBoard[i].h;
+        road.push_back(roadElement);
+    }
+
+    int count = 0;
+
+    for (auto &roadElement: road) {
+        if (roadElement.y == BOARD_SCORE_HEIGHT - BAND_WIDTH) {
+            roadElement.y += BAND_HEIGHT / 2 + BAND_WIDTH;
+            roadElement.w = BAND_HEIGHT + BAND_HEIGHT / 2 + 2 * BAND_WIDTH;
+        } else if (roadElement.y == WINDOW_HEIGHT - BAND_WIDTH) {
+            roadElement.y -= BAND_HEIGHT / 2;
+            roadElement.w = BAND_HEIGHT / 2;
+        } else if (roadElement.x == WINDOW_WIDTH - BAND_WIDTH) {
+            if (count % 2 == 0) {
+                roadElement.x -= 2 * BAND_HEIGHT + BAND_HEIGHT / 2 + BAND_WIDTH;
+                roadElement.y -= BAND_HEIGHT / 2;
+                roadElement.w = 5;
+                roadElement.h = BAND_HEIGHT;
+            } else {
+                roadElement.y += roadElement.h - BAND_HEIGHT / 2 - 3 * BAND_WIDTH;
+                roadElement.x = WINDOW_WIDTH / 2 + BAND_HEIGHT + BAND_HEIGHT / 2 + BAND_WIDTH;
+                roadElement.w = 3 * BAND_HEIGHT + BAND_HEIGHT / 2 - 3 * BAND_WIDTH;
+                roadElement.h = 5;
+            }
+        } else if (count >= 4 && count <= 8) {
+            if (roadElement.w > BAND_WIDTH) {
+                roadElement.y -= BAND_HEIGHT / 2;
+                roadElement.x -= BAND_HEIGHT / 2;
+                if (roadElement.w > BAND_HEIGHT) {
+                    roadElement.w += BAND_HEIGHT / 2 + BAND_WIDTH;
+                } else {
+                    roadElement.w = 3 * BAND_HEIGHT + 2 * BAND_WIDTH;
+                }
+            } else {
+                if (count % 2 == 0) {
+                    roadElement.y -= BAND_HEIGHT / 2;
+                    roadElement.x -= BAND_HEIGHT / 2;
+                    roadElement.w = BAND_HEIGHT;
+                    roadElement.h = 5;
+                } else {
+                    if (count == 5) {
+                        roadElement.y -= BAND_HEIGHT / 2;
+                        roadElement.x += BAND_HEIGHT / 2;
+                        roadElement.h = 2 * BAND_HEIGHT;
+                    } else {
+                        roadElement.y += BAND_HEIGHT / 2;
+                        roadElement.x -= BAND_HEIGHT / 2;
+                        roadElement.h += BAND_HEIGHT;
+                    }
+                }
+            }
+        } else if (count >= 9 && count <= 22) {
+            if (count <= 20) {
+                if (count >= 9 && count <= 12) {
+                    if (count< 11) {
+                        if (count % 2 != 0) {
+                            roadElement.x += BAND_HEIGHT / 2;
+                            roadElement.y += BAND_HEIGHT / 2;
+                            roadElement.h = BAND_HEIGHT;
+                        } else {
+                            roadElement.y -= BAND_HEIGHT / 2;
+                            roadElement.w = 2 * BAND_HEIGHT + 2 * BAND_WIDTH;
+                        }
+                    } else {
+                        if (count % 2 != 0) {
+                            roadElement.x += BAND_HEIGHT / 2;
+                            roadElement.y += BAND_HEIGHT / 2;
+                            roadElement.h = BAND_HEIGHT;
+                        } else {
+                            roadElement.y -= BAND_HEIGHT / 2;
+                            roadElement.w = 2 * BAND_HEIGHT + 2 * BAND_WIDTH + BAND_HEIGHT / 2;
+                        }
+                    }
+                } else if (count >= 15 && count <= 16) {
+                    if (count % 2 != 0) {
+                        roadElement.x += BAND_HEIGHT / 2;
+                        roadElement.y -= BAND_HEIGHT / 2;
+                    } else {
+                        roadElement.y -= BAND_HEIGHT / 2;
+                        roadElement.x += BAND_HEIGHT / 2;
+                        roadElement.w += BAND_WIDTH;
+                    }
+                } else {
+                    if (count % 2 != 0) {
+                        roadElement.x += BAND_HEIGHT / 2;
+                        roadElement.y -= BAND_HEIGHT / 2;
+                        roadElement.h += BAND_HEIGHT - BAND_WIDTH;
+                    } else {
+                        roadElement.x -= BAND_HEIGHT / 2;
+                        roadElement.y -= BAND_HEIGHT / 2;
+                        roadElement.w = BAND_HEIGHT + BAND_WIDTH;
+                    }
+                }
+            } else {
+                if (count % 2 != 0) {
+                    roadElement.y += BAND_HEIGHT + BAND_HEIGHT / 2;
+                    roadElement.x += BAND_HEIGHT + BAND_HEIGHT / 2 + BAND_WIDTH;
+                    roadElement.h = BAND_HEIGHT + BAND_WIDTH;
+                } else {
+                    roadElement.y += BAND_HEIGHT / 2;
+                    roadElement.w = BAND_HEIGHT / 2 + BAND_WIDTH;
+                }
+            }
+
+        } else if (count >= 23 && count <= 26) {
+            if (count< 25) {
+                if (count % 2 != 0) {
+                    roadElement.y -= BAND_HEIGHT / 2;
+                    roadElement.x -= BAND_HEIGHT / 2;
+                    roadElement.w = 3 * BAND_HEIGHT + 2 * BAND_WIDTH;
+                } else {
+                    roadElement.y -= BAND_HEIGHT / 2;
+                    roadElement.x += BAND_HEIGHT / 2;
+                    roadElement.h = 2 * BAND_HEIGHT;
+
+                    road.push_back(roadElement);
+                }
+            } else {
+                if (count % 2 != 0) {
+                    roadElement.x += BAND_HEIGHT / 2;
+                    roadElement.y -= BAND_HEIGHT / 2;
+                    roadElement.h = 3 * BAND_HEIGHT;
+                } else {
+                    roadElement.y -= BAND_HEIGHT / 2;
+                    roadElement.x -= BAND_HEIGHT / 2 + BAND_HEIGHT / 2 + BAND_WIDTH;
+                    roadElement.w += BAND_HEIGHT / 2 + BAND_WIDTH;
+                }
+            }
+        } else if (count >= 27 && count <= 32) {
+            if (count< 30) {
+                if (roadElement.w > BAND_WIDTH) {
+                    if (count % 2 == 0) {
+                        roadElement.x += BAND_HEIGHT + BAND_HEIGHT / 2 + BAND_WIDTH;
+                        roadElement.y -= BAND_HEIGHT / 2;
+                    } else {
+                        roadElement.y -= BAND_HEIGHT / 2;
+                        roadElement.x -= BAND_HEIGHT / 2;
+                        roadElement.w += BAND_HEIGHT;
+                    }
+                } else {
+                    roadElement.y -= BAND_HEIGHT / 2;
+                    roadElement.x += BAND_HEIGHT / 2;
+                    roadElement.h = 2 * BAND_HEIGHT;
+                }
+
+            } else {
+                if (roadElement.w > BAND_WIDTH) {
+                    if (count % 2 == 0) {
+                        roadElement.y -= BAND_HEIGHT / 2;
+                        roadElement.x -= BAND_HEIGHT / 2;
+                        roadElement.w += BAND_HEIGHT / 2;
+                    } else {
+                        roadElement.y += BAND_HEIGHT / 2;
+                        roadElement.x += BAND_HEIGHT / 2;
+                        roadElement.h = BAND_HEIGHT;
+                        roadElement.w = BAND_WIDTH;
+                    }
+                } else {
+                    roadElement.x -= 2 * BAND_HEIGHT - BAND_HEIGHT / 2 + 2 * BAND_WIDTH;
+                    roadElement.y += BAND_HEIGHT / 2;
+                    roadElement.h = 3 * BAND_HEIGHT;
+                }
+            }
+        }
+        count++;
+    }
+
+    road.at(length).y += BAND_HEIGHT + 2 * (BAND_HEIGHT / 2);
+    road.at(length).x -= BAND_HEIGHT;
+    road.at(length).w = BAND_HEIGHT;
+    road.at(length).h = BAND_WIDTH;
+
+    for (auto &roadElement: road) {
+        if (roadElement.w > BAND_WIDTH) {
+            roadElement.h = 0;
+        } else {
+            roadElement.w = 0;
+        }
+    }
+
+    count = 0;
+
+    for (auto roadElement: road) {
+        cout << "----" << count << "----\n";
+        cout << "X :" << roadElement.x << "\n";
+        cout << "Y :" << roadElement.y << "\n";
+        if (roadElement.w > 0) {
+            cout << "W :" << roadElement.w << "\n";
+        } else {
+            cout << "H :" << roadElement.h << "\n";
+        }
+        count++;
+    }
+
+    return road;
+}
+
 bool compareByHeight(const CellRoad &a, const CellRoad &b) {
     return a.y < b.y || (a.y == b.y && a.x < b.x);
 }
@@ -495,19 +678,14 @@ bool compareByWidth(const CellRoad &a, const CellRoad &b) {
     return a.x < b.x || (a.x == b.x && a.y < b.y);
 }
 
-bool printBoard(SDL_Rect *rects, int count) {
-    using namespace std;
-    if (SDL_FillRects(winSurface, rects, count, band_color) != 0) {
-        cout << "surface board: " << SDL_GetError() << endl;
-        return false;
-    }
-    return true;
-}
+bool printBoard(SDL_Rect *rects, int count, Uint8 r, Uint8 g, Uint8 b) {
 
-bool printRoad(SDL_Rect *rectsRoad, int count) {
+    Uint32 color;
+    color = SDL_MapRGB(winSurface->format, r, g, b);
+
     using namespace std;
-    if (SDL_FillRects(winSurface, rectsRoad, count, road_color) != 0) {
-        cout << "surface road: " << SDL_GetError() << endl;
+    if (SDL_FillRects(winSurface, rects, count, color) != 0) {
+        cout << "surface board: " << SDL_GetError() << endl;
         return false;
     }
     return true;
@@ -722,201 +900,6 @@ void generateBoard(SDL_Rect *rects) {
 
 }
 
-void generateRoad(SDL_Rect *rectsBoard, SDL_Rect *rectsRoad, int length, std::vector<CellRoad> &cellsRoad) {
-    using namespace std;
-
-    int count = 0;
-
-    for (int i = 0; i < length; ++i) {
-        *(rectsRoad + i) = *(rectsBoard + i);
-    }
-
-    for (int i = 0; i < length + 1; ++i) {
-        if (rectsRoad[i].y == BOARD_SCORE_HEIGHT - BAND_WIDTH) {
-            rectsRoad[i].y += BAND_HEIGHT / 2 + BAND_WIDTH;
-            rectsRoad[i].w = BAND_HEIGHT + BAND_HEIGHT / 2 + 2 * BAND_WIDTH;
-        } else if (rectsRoad[i].y == WINDOW_HEIGHT - BAND_WIDTH) {
-            rectsRoad[i].y -= BAND_HEIGHT / 2;
-            rectsRoad[i].w = BAND_HEIGHT / 2;
-        } else if (rectsRoad[i].x == WINDOW_WIDTH - BAND_WIDTH) {
-            if (i % 2 == 0) {
-                rectsRoad[i].x -= 2 * BAND_HEIGHT + BAND_HEIGHT / 2 + BAND_WIDTH;
-                rectsRoad[i].y -= BAND_HEIGHT / 2;
-                rectsRoad[i].w = 5;
-                rectsRoad[i].h = BAND_HEIGHT;
-            } else {
-                rectsRoad[i].y += rectsRoad[i].h - BAND_HEIGHT / 2 - 3 * BAND_WIDTH;
-                rectsRoad[i].x = WINDOW_WIDTH / 2 + BAND_HEIGHT + BAND_HEIGHT / 2 + BAND_WIDTH;
-                rectsRoad[i].w = 3 * BAND_HEIGHT + BAND_HEIGHT / 2 - 3 * BAND_WIDTH;
-                rectsRoad[i].h = 5;
-            }
-        } else if (i >= 4 && i <= 8) {
-            if (rectsRoad[i].w > BAND_WIDTH) {
-                rectsRoad[i].y -= BAND_HEIGHT / 2;
-                rectsRoad[i].x -= BAND_HEIGHT / 2;
-                if (rectsRoad[i].w > BAND_HEIGHT) {
-                    rectsRoad[i].w += BAND_HEIGHT / 2 + BAND_WIDTH;
-                } else {
-                    rectsRoad[i].w = 3 * BAND_HEIGHT + 2 * BAND_WIDTH;
-                }
-            } else {
-                if (i % 2 == 0) {
-                    rectsRoad[i].y -= BAND_HEIGHT / 2;
-                    rectsRoad[i].x -= BAND_HEIGHT / 2;
-                    rectsRoad[i].w = BAND_HEIGHT;
-                    rectsRoad[i].h = 5;
-                } else {
-                    if (i == 5) {
-                        rectsRoad[i].y -= BAND_HEIGHT / 2;
-                        rectsRoad[i].x += BAND_HEIGHT / 2;
-                        rectsRoad[i].h = 2 * BAND_HEIGHT;
-                    } else {
-                        rectsRoad[i].y += BAND_HEIGHT / 2;
-                        rectsRoad[i].x -= BAND_HEIGHT / 2;
-                        rectsRoad[i].h += BAND_HEIGHT;
-                    }
-                }
-            }
-        } else if (i >= 9 && i <= 22) {
-            if (i <= 20) {
-                if (i >= 9 && i <= 12) {
-                    if (i < 11) {
-                        if (i % 2 != 0) {
-                            rectsRoad[i].x += BAND_HEIGHT / 2;
-                            rectsRoad[i].y += BAND_HEIGHT / 2;
-                            rectsRoad[i].h = BAND_HEIGHT;
-                        } else {
-                            //change size here
-                            rectsRoad[i].y -= BAND_HEIGHT / 2;
-                            rectsRoad[i].w = 2 * BAND_HEIGHT + 2 * BAND_WIDTH;
-                        }
-                    } else {
-                        if (i % 2 != 0) {
-                            rectsRoad[i].x += BAND_HEIGHT / 2;
-                            rectsRoad[i].y += BAND_HEIGHT / 2;
-                            rectsRoad[i].h = BAND_HEIGHT;
-                        } else {
-                            rectsRoad[i].y -= BAND_HEIGHT / 2;
-                            rectsRoad[i].w = 2 * BAND_HEIGHT + 2 * BAND_WIDTH + BAND_HEIGHT / 2;
-                        }
-                    }
-                } else if (i >= 15 && i <= 16) {
-                    if (i % 2 != 0) {
-                        rectsRoad[i].x += BAND_HEIGHT / 2;
-                        rectsRoad[i].y -= BAND_HEIGHT / 2;
-                    } else {
-                        rectsRoad[i].y -= BAND_HEIGHT / 2;
-                        rectsRoad[i].x += BAND_HEIGHT / 2;
-                        rectsRoad[i].w += BAND_WIDTH;
-                    }
-                } else {
-                    if (i % 2 != 0) {
-                        rectsRoad[i].x += BAND_HEIGHT / 2;
-                        rectsRoad[i].y -= BAND_HEIGHT / 2;
-                        rectsRoad[i].h += BAND_HEIGHT - BAND_WIDTH;
-                    } else {
-                        rectsRoad[i].x -= BAND_HEIGHT / 2;
-                        rectsRoad[i].y -= BAND_HEIGHT / 2;
-                        rectsRoad[i].w = BAND_HEIGHT + BAND_WIDTH;
-                    }
-                }
-            } else {
-                if (i % 2 != 0) {
-                    rectsRoad[i].y += BAND_HEIGHT + BAND_HEIGHT / 2;
-                    rectsRoad[i].x += BAND_HEIGHT + BAND_HEIGHT / 2 + BAND_WIDTH;
-                    rectsRoad[i].h = BAND_HEIGHT + BAND_WIDTH;
-                } else {
-                    rectsRoad[i].y += BAND_HEIGHT / 2;
-                    rectsRoad[i].w = BAND_HEIGHT / 2 + BAND_WIDTH;
-                }
-            }
-
-        } else if (i >= 23 && i <= 26) {
-            if (i < 25) {
-                if (i % 2 != 0) {
-                    rectsRoad[i].y -= BAND_HEIGHT / 2;
-                    rectsRoad[i].x -= BAND_HEIGHT / 2;
-                    rectsRoad[i].w = 3 * BAND_HEIGHT + 2 * BAND_WIDTH;
-                } else {
-                    rectsRoad[i].y -= BAND_HEIGHT / 2;
-                    rectsRoad[i].x += BAND_HEIGHT / 2;
-                    rectsRoad[i].h = 2 * BAND_HEIGHT;
-
-                    *(rectsRoad + length) = rectsRoad[i];
-                    //add new track here
-                }
-            } else {
-                if (i % 2 != 0) {
-                    rectsRoad[i].x += BAND_HEIGHT / 2;
-                    rectsRoad[i].y -= BAND_HEIGHT / 2;
-                    rectsRoad[i].h = 3 * BAND_HEIGHT;
-                } else {
-                    rectsRoad[i].y -= BAND_HEIGHT / 2;
-                    rectsRoad[i].x -= BAND_HEIGHT / 2 + BAND_HEIGHT / 2 + BAND_WIDTH;
-                    rectsRoad[i].w += BAND_HEIGHT / 2 + BAND_WIDTH;
-                }
-            }
-        } else if (i >= 27 && i <= 32) {
-            if (i < 30) {
-                if (rectsRoad[i].w > BAND_WIDTH) {
-                    if (i % 2 == 0) {
-                        rectsRoad[i].x += BAND_HEIGHT + BAND_HEIGHT / 2 + BAND_WIDTH;
-                        rectsRoad[i].y -= BAND_HEIGHT / 2;
-                    } else {
-                        rectsRoad[i].y -= BAND_HEIGHT / 2;
-                        rectsRoad[i].x -= BAND_HEIGHT / 2;
-                        rectsRoad[i].w += BAND_HEIGHT;
-                    }
-                } else {
-                    rectsRoad[i].y -= BAND_HEIGHT / 2;
-                    rectsRoad[i].x += BAND_HEIGHT / 2;
-                    rectsRoad[i].h = 2 * BAND_HEIGHT;
-                }
-
-            } else {
-                if (rectsRoad[i].w > BAND_WIDTH) {
-                    if (i % 2 == 0) {
-                        rectsRoad[i].y -= BAND_HEIGHT / 2;
-                        rectsRoad[i].x -= BAND_HEIGHT / 2;
-                        rectsRoad[i].w += BAND_HEIGHT / 2;
-                    } else {
-                        rectsRoad[i].y += BAND_HEIGHT / 2;
-                        rectsRoad[i].x += BAND_HEIGHT / 2;
-                        rectsRoad[i].h = BAND_HEIGHT;
-                        rectsRoad[i].w = BAND_WIDTH;
-                    }
-                } else {
-                    rectsRoad[i].x -= 2 * BAND_HEIGHT - BAND_HEIGHT / 2 + 2 * BAND_WIDTH;
-                    rectsRoad[i].y += BAND_HEIGHT / 2;
-                    rectsRoad[i].h = 3 * BAND_HEIGHT;
-                }
-            }
-        } else {
-            rectsRoad[i].y += BAND_HEIGHT + 2 * (BAND_HEIGHT / 2);
-            rectsRoad[i].x -= BAND_HEIGHT;
-            rectsRoad[i].w = BAND_HEIGHT;
-            rectsRoad[i].h = 5;
-        }
-    }
-
-
-    for (int i = 0; i < length + 1; ++i) {
-        CellRoad cellRoad;
-        cellRoad.x = rectsRoad[i].x;
-        cellRoad.y = rectsRoad[i].y;
-        if (rectsRoad[i].w > BAND_WIDTH) {
-            cellRoad.w = rectsRoad[i].w;
-            cellRoad.h = 0;
-        } else {
-            cellRoad.h = rectsRoad[i].h;
-            cellRoad.w = 0;
-        }
-        cellsRoad.push_back(cellRoad);
-    }
-
-
-}
-
 void x_axis_Board(SDL_Rect *rectsBoardRight, SDL_Rect *rectsBoardLeft, int length) {
 
     for (int i = 0; i < length; ++i) {
@@ -933,6 +916,52 @@ void x_axis_Board(SDL_Rect *rectsBoardRight, SDL_Rect *rectsBoardLeft, int lengt
     }
 
 
+}
+
+int changeRender(Pacman pacman, coordinates c) {
+
+    int position = 0;
+
+    switch (c) {
+        case WIDTH:
+            if (pacman.x == WINDOW_WIDTH) {
+                position = pacman.x;
+            } else if (pacman.x == 0) {
+                position = pacman.x - 30;
+            } else {
+                position = pacman.x - (30 / 2);
+            }
+            break;
+        case HEIGHT:
+            position = pacman.y - (30 / 2);
+            break;
+    }
+
+    return position;
+}
+
+Pacman tunnelSwap(Pacman &pacman) {
+
+    Pacman pacman1 = pacman;
+
+    int tunnelDirect = 0;
+
+    if (pacman.x == 0) {
+        tunnelDirect = 1;
+    } else if (pacman.x == WINDOW_WIDTH) {
+        tunnelDirect = 2;
+    }
+
+    switch (tunnelDirect) {
+        case 1:
+            pacman1.x = WINDOW_WIDTH - BAND_WIDTH;
+            break;
+        case 2:
+            pacman1.x = BAND_WIDTH;
+            break;
+    }
+
+    return pacman1;
 }
 
 bool load() {
