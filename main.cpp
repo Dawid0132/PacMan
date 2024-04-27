@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include "chrono"
+#include <random>
 
 
 SDL_Window *window;
@@ -13,6 +14,8 @@ SDL_Texture *red_ghost;
 SDL_Texture *pink_ghost;
 SDL_Texture *blue_ghost;
 SDL_Texture *dead_ghost;
+SDL_Texture *dead_ghostV2;
+SDL_Texture *ghost_eyes;
 SDL_Texture *point_bitmap;
 SDL_Texture *bonus_point;
 SDL_Texture *score_message;
@@ -43,10 +46,11 @@ struct pacman {
     int y;
     int x;
     int currentNodeDestination;
+    int lives = 2;
 };
 
 enum ghost_colors {
-    RED, YELLOW, PINK, BLUE
+    RED, YELLOW, PINK, BLUE, OTHER
 };
 
 struct Cell {
@@ -69,11 +73,16 @@ struct ghost {
     bool trapped = true;
     bool dead = false;
     std::vector<CellRoad> ghostWay;
+    std::vector<CellRoad> ghostRunAway;
+    std::vector<CellRoad> roadToTrap;
     bool addNewPath;
     float slowingGhost = 0.0f;
     bool readyToEscape = false;
     bool readyToLeave = false;
     bool escaped = false;
+    bool caught = false;
+    float printNextTexture = 0.5f;
+    bool deleted = false;
 };
 
 std::vector<CellRoad> joinElements(std::vector<CellRoad> cellRoad);
@@ -138,18 +147,37 @@ void ghostMoving(std::vector<CellRoad> &ghostWay, ghost &ghostCoordinate, SDL_Re
 bool escapeFromTrap(ghost &ghostCoordinate, std::vector<CellRoad> &road, bool &escape, SDL_Rect &ghostRender,
                     bool &escaped);
 
-void backToTrap(ghost &blinky, SDL_Rect &blinkyRendering, ghost &pinky, SDL_Rect &pinkyRendering, ghost &inky,
-                SDL_Rect &inkyRendering, ghost &clyde, SDL_Rect &clydeRendering, std::vector<CellRoad> &ghostRoad);
+void movingInTrap(ghost &blinky, SDL_Rect &blinkyRendering, ghost &pinky, SDL_Rect &pinkyRendering, ghost &inky,
+                  SDL_Rect &inkyRendering, ghost &clyde, SDL_Rect &clydeRendering, std::vector<CellRoad> &ghostRoad);
 
 bool setEscapePosition(ghost &any, std::vector<CellRoad> &ghostRoad, SDL_Rect &anyRendering, bool &readyToEscape);
 
-void increaseCountGhosts(int totalScore, ghost &blinky, ghost &pinky, ghost &inky, ghost &clyde);
+void increaseCountGhosts(int totalScore, ghost &blinky, ghost &pinky, ghost &inky, ghost &clyde, int &spawnPlace);
 
 void setDeadAllGhosts(ghost &red, ghost &yellow, ghost &blue, ghost &pink);
 
 void renderGhosts(SDL_Rect &red, ghost &redCoordinate, SDL_Rect &yellow, ghost &yelloCoordinate, SDL_Rect &pink,
                   ghost &pinkCoordinate,
                   SDL_Rect &blue, ghost &blueCoordinate);
+
+void runAwayGhostMode(SDL_Rect
+                      &ghostRendering,
+                      ghost &ghostCoordinate, std::vector<std::vector<CellRoad>>
+                      &neighboursRoad,
+                      pacman &pacmanCoordinate, std::vector<CellRoad> &road);
+
+void runningAway(ghost &ghostCoordinate, SDL_Rect &ghostRendering);
+
+bool
+meetingPacmanWithGhosts(ghost &redCoordinate, ghost &yellowCoordinate, ghost &blueCoordinate, ghost &pinkCoordinate,
+                        pacman &pacmanCoordinate);
+
+bool
+findFreePlaceInTrap(ghost &ghostCoordinate, std::vector<CellRoad> &ghostRoad, int &spawnPlace, CellRoad &freePlace);
+
+size_t findSpawnPlace(CellRoad &destination, std::vector<CellRoad> &joinedRoad);
+
+void runningToTrap(ghost &ghostCoordinate, SDL_Rect &ghostRendering);
 
 bool load();
 
@@ -165,6 +193,7 @@ int main(int argc, char *args[]) {
     if (!load()) return 1;
 
     int TotalScore = 0;
+    int spawnPlace = 3;
     bool startGame = false;
     bool escape = false;
 
@@ -220,10 +249,12 @@ int main(int argc, char *args[]) {
 
     std::vector<CellRoad> road;
     std::vector<CellRoad> ghostRoad;
+    std::vector<CellRoad> joinedRoad;
     std::vector<Cell> pointsCoordinates;
     std::vector<Cell> bonusPointsCoordinates;
 
     std::vector<std::vector<CellRoad>> neighboursGraph;
+    std::vector<std::vector<CellRoad>> joinedNeighboursGraph;
 
 
     generateBoard(bounds_coordinatesRight);
@@ -239,6 +270,10 @@ int main(int argc, char *args[]) {
     ghostRoad = joinGhostRoadWithPacManRoad(road, ghostRoad);
 
     neighboursGraph = createGraphWithAllNeighbours(road);
+
+    joinedRoad.insert(joinedRoad.end(), road.begin(), road.end());
+    joinedRoad.insert(joinedRoad.end(), ghostRoad.begin(), ghostRoad.end());
+    joinedNeighboursGraph = createGraphWithAllNeighbours(joinedRoad);
 
 
     int count = 0;
@@ -308,7 +343,6 @@ int main(int argc, char *args[]) {
                     break;
             }
         }
-
 
         switch (direction) {
             case 1:
@@ -464,12 +498,54 @@ int main(int argc, char *args[]) {
         if (red_ghost_coordinate.dead || pink_ghost_coordinate.dead || blue_ghost_coordinate.dead ||
             yellow_ghost_coordinate.dead) {
             t2 = chrono::high_resolution_clock::now();
-            chrono::duration<int> time_span = chrono::duration_cast<chrono::duration<int>>(t2 - t1);
-            if (time_span.count() >= 5) {
-                red_ghost_coordinate.dead = false;
-                pink_ghost_coordinate.dead = false;
-                blue_ghost_coordinate.dead = false;
-                yellow_ghost_coordinate.dead = false;
+            chrono::duration<int> time_span = chrono::duration_cast<chrono::duration<int >>(t2 - t1);
+
+            if (time_span.count() >= 7) {
+                if (red_ghost_coordinate.dead) {
+                    red_ghost_coordinate.printNextTexture += 0.5f;
+                }
+
+                if (pink_ghost_coordinate.dead) {
+                    pink_ghost_coordinate.printNextTexture += 0.5f;
+                }
+
+                if (blue_ghost_coordinate.dead) {
+                    blue_ghost_coordinate.printNextTexture += 0.5f;
+                }
+                if (yellow_ghost_coordinate.dead) {
+                    yellow_ghost_coordinate.printNextTexture += 0.5f;
+                }
+            }
+
+            if (time_span.count() >= 10) {
+                if (red_ghost_coordinate.dead) {
+                    red_ghost_coordinate.dead = false;
+                    red_ghost_coordinate.printNextTexture = 0.5f;
+                    red_ghost_coordinate.slowingGhost = 0.0f;
+                    red_ghost_coordinate.ghostRunAway.clear();
+                    red_ghost_coordinate.ghostWay.clear();
+                }
+                if (pink_ghost_coordinate.dead) {
+                    pink_ghost_coordinate.dead = false;
+                    pink_ghost_coordinate.printNextTexture = 0.5f;
+                    pink_ghost_coordinate.slowingGhost = 0.0f;
+                    pink_ghost_coordinate.ghostRunAway.clear();
+                    pink_ghost_coordinate.ghostWay.clear();
+                }
+                if (blue_ghost_coordinate.dead) {
+                    blue_ghost_coordinate.dead = false;
+                    blue_ghost_coordinate.printNextTexture = 0.5f;
+                    blue_ghost_coordinate.slowingGhost = 0.0f;
+                    blue_ghost_coordinate.ghostRunAway.clear();
+                    blue_ghost_coordinate.ghostWay.clear();
+                }
+                if (yellow_ghost_coordinate.dead) {
+                    yellow_ghost_coordinate.dead = false;
+                    yellow_ghost_coordinate.printNextTexture = 0.5f;
+                    yellow_ghost_coordinate.slowingGhost = 0.0f;
+                    yellow_ghost_coordinate.ghostRunAway.clear();
+                    yellow_ghost_coordinate.ghostWay.clear();
+                }
             }
         }
 
@@ -502,28 +578,109 @@ int main(int argc, char *args[]) {
                                                                    yellow_ghost_coordinate.currentNodeSource,
                                                                    road, YELLOW);
             }
-
-
         }
 
-        if (!red_ghost_coordinate.ghostWay.empty()) {
+        if (!red_ghost_coordinate.ghostWay.empty() && !red_ghost_coordinate.dead && !red_ghost_coordinate.caught) {
             ghostMoving(red_ghost_coordinate.ghostWay, red_ghost_coordinate, red_ghost_render, pacman,
                         red_ghost_coordinate.addNewPath);
+        } else if (red_ghost_coordinate.dead) {
+            if (!red_ghost_coordinate.ghostRunAway.empty()) {
+                runningAway(red_ghost_coordinate, red_ghost_render);
+            } else {
+                runAwayGhostMode(red_ghost_render, red_ghost_coordinate, neighboursGraph, pacman, road);
+            }
+        } else if (red_ghost_coordinate.caught) {
+            if (!red_ghost_coordinate.roadToTrap.empty()) {
+                runningToTrap(red_ghost_coordinate, red_ghost_render);
+            } else {
+                CellRoad destination = {};
+                if (findFreePlaceInTrap(red_ghost_coordinate, ghostRoad, spawnPlace, destination)) {
+                    int index = findSpawnPlace(destination, joinedRoad);
+                    red_ghost_coordinate.roadToTrap = getShortestPath(joinedNeighboursGraph,
+                                                                      index, red_ghost_coordinate.currentNodeSource,
+                                                                      joinedRoad, OTHER);
+                } else {
+                    red_ghost_coordinate.deleted = true;
+                }
+            }
         }
 
-        if (!pink_ghost_coordinate.ghostWay.empty()) {
+        if (!pink_ghost_coordinate.ghostWay.empty() && !pink_ghost_coordinate.dead && !pink_ghost_coordinate.caught) {
             ghostMoving(pink_ghost_coordinate.ghostWay, pink_ghost_coordinate, pink_ghost_render, pacman,
                         pink_ghost_coordinate.addNewPath);
+        } else if (pink_ghost_coordinate.dead) {
+            if (!pink_ghost_coordinate.ghostRunAway.empty()) {
+                runningAway(pink_ghost_coordinate, pink_ghost_render);
+            } else {
+                runAwayGhostMode(pink_ghost_render, pink_ghost_coordinate, neighboursGraph, pacman, road);
+            }
+        } else if (pink_ghost_coordinate.caught) {
+            if (!pink_ghost_coordinate.roadToTrap.empty()) {
+                runningToTrap(pink_ghost_coordinate, pink_ghost_render);
+            } else {
+                CellRoad destination = {};
+                if (findFreePlaceInTrap(pink_ghost_coordinate, ghostRoad, spawnPlace, destination)) {
+                    int index = findSpawnPlace(destination, joinedRoad);
+                    pink_ghost_coordinate.roadToTrap = getShortestPath(joinedNeighboursGraph,
+                                                                       index, pink_ghost_coordinate.currentNodeSource,
+                                                                       joinedRoad, OTHER);
+                } else {
+                    pink_ghost_coordinate.deleted = true;
+                }
+            }
         }
 
-        if (!yellow_ghost_coordinate.ghostWay.empty()) {
+        if (!yellow_ghost_coordinate.ghostWay.empty() && !yellow_ghost_coordinate.dead &&
+            !yellow_ghost_coordinate.caught) {
             ghostMoving(yellow_ghost_coordinate.ghostWay, yellow_ghost_coordinate, yellow_ghost_render, pacman,
                         yellow_ghost_coordinate.addNewPath);
+        } else if (yellow_ghost_coordinate.dead) {
+            if (!yellow_ghost_coordinate.ghostRunAway.empty()) {
+                runningAway(yellow_ghost_coordinate, yellow_ghost_render);
+            } else {
+                runAwayGhostMode(yellow_ghost_render, yellow_ghost_coordinate, neighboursGraph, pacman, road);
+            }
+        } else if (yellow_ghost_coordinate.caught) {
+            if (!yellow_ghost_coordinate.roadToTrap.empty()) {
+                runningToTrap(yellow_ghost_coordinate, yellow_ghost_render);
+            } else {
+                CellRoad destination = {};
+                if (findFreePlaceInTrap(yellow_ghost_coordinate, ghostRoad, spawnPlace, destination)) {
+                    int index = findSpawnPlace(destination, joinedRoad);
+                    yellow_ghost_coordinate.roadToTrap = getShortestPath(joinedNeighboursGraph,
+                                                                         index,
+                                                                         yellow_ghost_coordinate.currentNodeSource,
+                                                                         joinedRoad, OTHER);
+                } else {
+                    yellow_ghost_coordinate.deleted = true;
+                }
+            }
         }
 
-        if (!blue_ghost_coordinate.ghostWay.empty()) {
+        if (!blue_ghost_coordinate.ghostWay.empty() && !blue_ghost_coordinate.dead && !blue_ghost_coordinate.caught) {
             ghostMoving(blue_ghost_coordinate.ghostWay, blue_ghost_coordinate, blue_ghost_render, pacman,
                         blue_ghost_coordinate.addNewPath);
+        } else if (blue_ghost_coordinate.dead) {
+            if (!blue_ghost_coordinate.ghostRunAway.empty()) {
+                runningAway(blue_ghost_coordinate, blue_ghost_render);
+            } else {
+                runAwayGhostMode(blue_ghost_render, blue_ghost_coordinate, neighboursGraph, pacman, road);
+            }
+        } else if (blue_ghost_coordinate.caught) {
+            if (!blue_ghost_coordinate.roadToTrap.empty()) {
+                runningToTrap(blue_ghost_coordinate, blue_ghost_render);
+            } else {
+                CellRoad destination = {};
+                if (findFreePlaceInTrap(blue_ghost_coordinate, ghostRoad, spawnPlace, destination)) {
+                    int index = findSpawnPlace(destination, joinedRoad);
+                    blue_ghost_coordinate.roadToTrap = getShortestPath(joinedNeighboursGraph,
+                                                                       index,
+                                                                       blue_ghost_coordinate.currentNodeSource,
+                                                                       joinedRoad, OTHER);
+                } else {
+                    blue_ghost_coordinate.deleted = true;
+                }
+            }
         }
 
         pacman = tunnelSwap(pacman);
@@ -532,24 +689,42 @@ int main(int argc, char *args[]) {
         pacmanRender.y = changeRender(pacman.y, HEIGHT);
 
         for (auto &point: pointsCoordinates) {
-            if (pacman.x == point.x && pacman.y == point.y) {
-                TotalScore += 10;
-                if (TotalScore % 1000 == 0) {
-                    score_position.w = BAND_HEIGHT;
-                }
+            if (point.x > pacman.x && point.x < pacman.x + 10 && pacman.y == point.y ||
+                point.x < pacman.x && point.x > pacman.x - 10 && pacman.y == point.y) {
                 pointsCoordinates.erase(
                         remove_if(pointsCoordinates.begin(), pointsCoordinates.end(), [point](const Cell &c) {
                             return c.x == point.x && c.y == point.y;
                         }));
+                TotalScore += 10;
+            } else if (point.y > pacman.y && point.y < pacman.y + 10 && pacman.x == point.x ||
+                       point.y < pacman.y && point.y > pacman.y - 10 && pacman.x == point.x) {
+                pointsCoordinates.erase(
+                        remove_if(pointsCoordinates.begin(), pointsCoordinates.end(), [point](const Cell &c) {
+                            return c.x == point.x && c.y == point.y;
+                        }));
+                TotalScore += 10;
+            }
+            if (TotalScore % 1000 == 0) {
+                score_position.w = BAND_HEIGHT;
             }
         }
 
         for (auto &bonusPoint: bonusPointsCoordinates) {
-            if (pacman.x == bonusPoint.x && pacman.y == bonusPoint.y) {
+
+            if (bonusPoint.x > pacman.x && bonusPoint.x < pacman.x + 10 && pacman.y == bonusPoint.y ||
+                bonusPoint.x < pacman.x && bonusPoint.x > pacman.x - 10 && pacman.y == bonusPoint.y) {
                 TotalScore += 100;
-                if (TotalScore % 1000 == 0) {
-                    score_position.w = BAND_HEIGHT;
-                }
+                bonusPointsCoordinates.erase(
+                        remove_if(bonusPointsCoordinates.begin(), bonusPointsCoordinates.end(),
+                                  [bonusPoint](const Cell &c) {
+                                      return c.x == bonusPoint.x && c.y == bonusPoint.y;
+                                  }));
+                setDeadAllGhosts(red_ghost_coordinate, yellow_ghost_coordinate, blue_ghost_coordinate,
+                                 pink_ghost_coordinate);
+                t1 = chrono::high_resolution_clock::now();
+            } else if (bonusPoint.y > pacman.y && bonusPoint.y < pacman.y + 10 && pacman.x == bonusPoint.x ||
+                       bonusPoint.y < pacman.y && bonusPoint.y > pacman.y - 10 && pacman.x == bonusPoint.x) {
+                TotalScore += 100;
                 bonusPointsCoordinates.erase(
                         remove_if(bonusPointsCoordinates.begin(), bonusPointsCoordinates.end(),
                                   [bonusPoint](const Cell &c) {
@@ -559,8 +734,11 @@ int main(int argc, char *args[]) {
                                  pink_ghost_coordinate);
                 t1 = chrono::high_resolution_clock::now();
             }
-        }
 
+            if (TotalScore % 1000 == 0) {
+                score_position.w = BAND_HEIGHT;
+            }
+        }
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
         SDL_RenderClear(renderer);
@@ -572,12 +750,11 @@ int main(int argc, char *args[]) {
 
 
         increaseCountGhosts(TotalScore, red_ghost_coordinate, pink_ghost_coordinate, blue_ghost_coordinate,
-                            yellow_ghost_coordinate);
+                            yellow_ghost_coordinate, spawnPlace);
 
-
-        backToTrap(red_ghost_coordinate, red_ghost_render, pink_ghost_coordinate, pink_ghost_render,
-                   blue_ghost_coordinate, blue_ghost_render, yellow_ghost_coordinate, yellow_ghost_render,
-                   ghostRoad);
+        movingInTrap(red_ghost_coordinate, red_ghost_render, pink_ghost_coordinate, pink_ghost_render,
+                     blue_ghost_coordinate, blue_ghost_render, yellow_ghost_coordinate, yellow_ghost_render,
+                     ghostRoad);
 
 
         if (!pink_ghost_coordinate.trapped && !pink_ghost_coordinate.escaped) {
@@ -645,22 +822,26 @@ int main(int argc, char *args[]) {
             }
         }
 
-
         SDL_RenderCopy(renderer, pacman_bitmap, NULL, &pacmanRender);
         SDL_RenderCopy(renderer, score_message, NULL, &messageRender);
         renderGhosts(red_ghost_render, red_ghost_coordinate, yellow_ghost_render, yellow_ghost_coordinate,
                      pink_ghost_render, pink_ghost_coordinate, blue_ghost_render, blue_ghost_coordinate);
         printPoint(pointsCoordinates);
         printBonusPoint(bonusPointsCoordinates);
+
         if (printScore(TotalScore)) {
             SDL_RenderCopy(renderer, scoreCount, NULL, &score_position);
+        }
+
+        if (meetingPacmanWithGhosts(red_ghost_coordinate, yellow_ghost_coordinate, blue_ghost_coordinate,
+                                    pink_ghost_coordinate, pacman)) {
+            cout << "End Game!\n";
         }
 
         SDL_RenderPresent(renderer);
         SDL_Delay(10);
 
     }
-
 
     system("pause");
     kill();
@@ -1964,7 +2145,6 @@ void setSourceNodeGhost(ghost &ghostCoordinate, std::vector<CellRoad> &road) {
                    ghostCoordinate.x == currentNode.x) {
             ghostCoordinate.currentNodeSource = count;
         }
-
         count++;
     }
 }
@@ -1996,7 +2176,6 @@ void ghostMoving(std::vector<CellRoad> &ghostWay, ghost &ghostCoordinate, SDL_Re
                 }
 
             }
-
         } else {
             if (lastElement.y <= ghostCoordinate.y && lastElement.y + lastElement.h >= ghostCoordinate.y) {
 
@@ -2093,8 +2272,8 @@ bool escapeFromTrap(ghost &ghostCoordinate, std::vector<CellRoad> &road, bool &e
     return false;
 }
 
-void backToTrap(ghost &blinky, SDL_Rect &blinkyRendering, ghost &pinky, SDL_Rect &pinkyRendering, ghost &inky,
-                SDL_Rect &inkyRendering, ghost &clyde, SDL_Rect &clydeRendering, std::vector<CellRoad> &ghostRoad) {
+void movingInTrap(ghost &blinky, SDL_Rect &blinkyRendering, ghost &pinky, SDL_Rect &pinkyRendering, ghost &inky,
+                  SDL_Rect &inkyRendering, ghost &clyde, SDL_Rect &clydeRendering, std::vector<CellRoad> &ghostRoad) {
 
 
     int temp = 0;
@@ -2154,33 +2333,36 @@ bool setEscapePosition(ghost &any, std::vector<CellRoad> &ghostRoad, SDL_Rect &a
     return false;
 }
 
-void increaseCountGhosts(int totalScore, ghost &blinky, ghost &pinky, ghost &inky, ghost &clyde) {
+void increaseCountGhosts(int totalScore, ghost &blinky, ghost &pinky, ghost &inky, ghost &clyde, int &spawnPlace) {
 
 
-    if (totalScore >= 500 && totalScore < 1000) {
+    if (totalScore >= 300 && totalScore < 400 && pinky.trapped) {
+        spawnPlace--;
         pinky.trapped = false;
-    } else if (totalScore >= 1000 && totalScore < 1200) {
+    } else if (totalScore >= 400 && totalScore < 500 && inky.trapped) {
+        spawnPlace--;
         inky.trapped = false;
-    } else if (totalScore >= 1200 && totalScore < 1400) {
+    } else if (totalScore >= 500 && totalScore < 600 && clyde.trapped) {
+        spawnPlace--;
         clyde.trapped = false;
     }
 
 }
 
 void setDeadAllGhosts(ghost &red, ghost &yellow, ghost &blue, ghost &pink) {
-    if (!red.trapped) {
+    if (!red.trapped && red.escaped && !red.caught) {
         red.dead = true;
     }
 
-    if (!yellow.trapped) {
+    if (!yellow.trapped && yellow.escaped && !yellow.caught) {
         yellow.dead = true;
     }
 
-    if (!blue.trapped) {
+    if (!blue.trapped && blue.escaped && !blue.caught) {
         blue.dead = true;
     }
 
-    if (!pink.trapped) {
+    if (!pink.trapped && pink.escaped && !pink.caught) {
         pink.dead = true;
     }
 }
@@ -2235,52 +2417,403 @@ void renderGhosts(SDL_Rect &red, ghost &redCoordinate, SDL_Rect &yellow, ghost &
                   ghost &pinkCoordinate,
                   SDL_Rect &blue, ghost &blueCoordinate) {
 
-
-    if (redCoordinate.dead) {
-        SDL_RenderCopy(renderer, dead_ghost, NULL, &red);
-    } else {
-        SDL_RenderCopy(renderer, red_ghost, NULL, &red);
+    if (!redCoordinate.deleted) {
+        if (redCoordinate.dead) {
+            if (floorf(redCoordinate.printNextTexture) == redCoordinate.printNextTexture) {
+                SDL_RenderCopy(renderer, dead_ghostV2, NULL, &red);
+            } else {
+                SDL_RenderCopy(renderer, dead_ghost, NULL, &red);
+            }
+        } else if (redCoordinate.caught) {
+            SDL_RenderCopy(renderer, ghost_eyes, NULL, &red);
+        } else {
+            SDL_RenderCopy(renderer, red_ghost, NULL, &red);
+        }
     }
 
-    if (yelloCoordinate.dead) {
-        SDL_RenderCopy(renderer, dead_ghost, NULL, &yellow);
-    } else {
-        SDL_RenderCopy(renderer, yellow_ghost, NULL, &yellow);
-
+    if (!yelloCoordinate.deleted) {
+        if (yelloCoordinate.dead) {
+            if (floorf(yelloCoordinate.printNextTexture) == yelloCoordinate.printNextTexture) {
+                SDL_RenderCopy(renderer, dead_ghostV2, NULL, &yellow);
+            } else {
+                SDL_RenderCopy(renderer, dead_ghost, NULL, &yellow);
+            }
+        } else if (yelloCoordinate.caught) {
+            SDL_RenderCopy(renderer, ghost_eyes, NULL, &yellow);
+        } else {
+            SDL_RenderCopy(renderer, yellow_ghost, NULL, &yellow);
+        }
     }
 
-    if (blueCoordinate.dead) {
-        SDL_RenderCopy(renderer, dead_ghost, NULL, &blue);
-    } else {
-        SDL_RenderCopy(renderer, blue_ghost, NULL, &blue);
+    if (!blueCoordinate.deleted) {
+        if (blueCoordinate.dead) {
+            if (floorf(blueCoordinate.printNextTexture) == blueCoordinate.printNextTexture) {
+                SDL_RenderCopy(renderer, dead_ghostV2, NULL, &blue);
+            } else {
+                SDL_RenderCopy(renderer, dead_ghost, NULL, &blue);
+            }
+        } else if (blueCoordinate.caught) {
+            SDL_RenderCopy(renderer, ghost_eyes, NULL, &blue);
+        } else {
+            SDL_RenderCopy(renderer, blue_ghost, NULL, &blue);
 
+        }
     }
 
-    if (pinkCoordinate.dead) {
-        SDL_RenderCopy(renderer, dead_ghost, NULL, &pink);
-    } else {
-        SDL_RenderCopy(renderer, pink_ghost, NULL, &pink);
+    if (!pinkCoordinate.deleted) {
+        if (pinkCoordinate.dead) {
+            if (floorf(pinkCoordinate.printNextTexture) == pinkCoordinate.printNextTexture) {
+                SDL_RenderCopy(renderer, dead_ghostV2, NULL, &pink);
+            } else {
+                SDL_RenderCopy(renderer, dead_ghost, NULL, &pink);
+            }
+        } else if (pinkCoordinate.caught) {
+            SDL_RenderCopy(renderer, ghost_eyes, NULL, &pink);
+        } else {
+            SDL_RenderCopy(renderer, pink_ghost, NULL, &pink);
+        }
     }
 
 }
 
+void runAwayGhostMode(SDL_Rect
+                      &ghostRendering,
+                      ghost &ghostCoordinate, std::vector<std::vector<CellRoad>>
+                      &neighboursRoad,
+                      pacman &pacmanCoordinate, std::vector<CellRoad> &road) {
+
+    using namespace std;
+
+    random_device rd;
+    mt19937 rdgen(rd());
+
+    int currentNodeSourceGhost = ghostCoordinate.currentNodeSource;
+
+    ghostCoordinate.ghostRunAway.push_back(road.at(currentNodeSourceGhost));
+
+    int count = 0;
+    int key = true;
+
+    CellRoad nextNeighbour = {};
+
+    for (int i = 0; i < 5; ++i) {
+
+        key = true;
+
+        while (key) {
+            count = 0;
+            uniform_int_distribution<size_t> d{0, neighboursRoad[currentNodeSourceGhost].size()};
+
+            nextNeighbour = neighboursRoad[currentNodeSourceGhost][d(rdgen)];
+
+            for (auto &cellRoad: road) {
+                if (nextNeighbour.x == cellRoad.x && nextNeighbour.y == cellRoad.y && nextNeighbour.w == cellRoad.w) {
+                    if (count != pacmanCoordinate.currentNodeDestination) {
+                        if (std::find_if(ghostCoordinate.ghostRunAway.begin(), ghostCoordinate.ghostRunAway.end(),
+                                         [&cr = cellRoad](const CellRoad &c) {
+                                             return cr.x == c.x && cr.y == c.y && c.w == cr.w;
+                                         }) != ghostCoordinate.ghostRunAway.end()) {
+
+                        } else {
+                            ghostCoordinate.ghostRunAway.push_back(nextNeighbour);
+                            currentNodeSourceGhost = count;
+                            key = false;
+                        }
+                    }
+
+                }
+                count++;
+            }
+        }
+    }
+}
+
+void runningAway(ghost &ghostCoordinate, SDL_Rect &ghostRendering) {
+
+    CellRoad currentRoad = {};
+    CellRoad nextRoad = {};
+
+    bool key = false;
+
+
+    if (ghostCoordinate.ghostRunAway.size() > 1) {
+        currentRoad = ghostCoordinate.ghostRunAway.front();
+        nextRoad = ghostCoordinate.ghostRunAway[1];
+
+        if (currentRoad.w > 0) {
+            if (currentRoad.x <= ghostCoordinate.x && currentRoad.x + currentRoad.w >= ghostCoordinate.x) {
+
+                if (nextRoad.x > ghostCoordinate.x) {
+                    ghostCoordinate.d = RIGHT;
+                } else if (nextRoad.x < ghostCoordinate.x) {
+                    ghostCoordinate.d = LEFT;
+                }
+
+                if (ghostCoordinate.x == nextRoad.x) {
+                    ghostCoordinate.ghostRunAway.erase(
+                            remove_if(ghostCoordinate.ghostRunAway.begin(), ghostCoordinate.ghostRunAway.end(),
+                                      [currentRoad](const CellRoad &c) {
+                                          return c.x == currentRoad.x && c.y == currentRoad.y && c.w == currentRoad.w;
+                                      }));
+                    ghostCoordinate.d = STOP;
+                }
+            }
+        } else {
+            if (currentRoad.y <= ghostCoordinate.y && currentRoad.y + currentRoad.h >= ghostCoordinate.y) {
+
+                if (nextRoad.y < ghostCoordinate.y) {
+                    ghostCoordinate.d = UP;
+                } else if (nextRoad.y > ghostCoordinate.y) {
+                    ghostCoordinate.d = DOWN;
+                }
+
+                if (ghostCoordinate.y == nextRoad.y) {
+                    ghostCoordinate.ghostRunAway.erase(
+                            remove_if(ghostCoordinate.ghostRunAway.begin(), ghostCoordinate.ghostRunAway.end(),
+                                      [currentRoad](const CellRoad &c) {
+                                          return c.x == currentRoad.x && c.y == currentRoad.y && c.w == currentRoad.w;
+                                      }));
+                    ghostCoordinate.d = STOP;
+                }
+
+            }
+        }
+    } else {
+        currentRoad = ghostCoordinate.ghostRunAway.front();
+        ghostCoordinate.ghostRunAway.erase(
+                remove_if(ghostCoordinate.ghostRunAway.begin(), ghostCoordinate.ghostRunAway.end(),
+                          [currentRoad](const CellRoad &c) {
+                              return c.x == currentRoad.x && c.y == currentRoad.y && c.w == currentRoad.w;
+                          }));
+    }
+
+
+    ghostCoordinate.slowingGhost += 0.5f;
+
+    switch (ghostCoordinate.d) {
+        case UP:
+            if (floorf(ghostCoordinate.slowingGhost) == ghostCoordinate.slowingGhost) {
+                ghostCoordinate.y--;
+                key = true;
+            }
+            break;
+        case DOWN:
+            if (floorf(ghostCoordinate.slowingGhost) == ghostCoordinate.slowingGhost) {
+                ghostCoordinate.y++;
+                key = true;
+            }
+            break;
+        case LEFT:
+            if (floorf(ghostCoordinate.slowingGhost) == ghostCoordinate.slowingGhost) {
+                ghostCoordinate.x--;
+                key = true;
+            }
+            break;
+        case RIGHT:
+            if (floorf(ghostCoordinate.slowingGhost) == ghostCoordinate.slowingGhost) {
+                ghostCoordinate.x++;
+                key = true;
+            }
+            break;
+        case STOP:
+            break;
+    }
+
+    if (key) {
+        ghostRendering.x = ghostCoordinate.x;
+        ghostRendering.y = ghostCoordinate.y;
+    }
+
+}
+
+bool
+meetingPacmanWithGhosts(ghost &redCoordinate, ghost &yellowCoordinate, ghost &blueCoordinate, ghost &pinkCoordinate,
+                        pacman &pacmanCoordinate) {
+
+    if (pacmanCoordinate.x == redCoordinate.x && pacmanCoordinate.y == redCoordinate.y) {
+        if (redCoordinate.dead) {
+            redCoordinate.dead = false;
+            redCoordinate.caught = true;
+        } else {
+            if (pacmanCoordinate.lives != 0) {
+                pacmanCoordinate.lives--;
+            } else {
+                return true;
+            }
+        }
+    }
+
+    if (pacmanCoordinate.x == yellowCoordinate.x && pacmanCoordinate.y == yellowCoordinate.y) {
+        if (yellowCoordinate.dead) {
+            yellowCoordinate.dead = false;
+            yellowCoordinate.caught = true;
+        } else {
+            if (pacmanCoordinate.lives != 0) {
+                pacmanCoordinate.lives--;
+            } else {
+                return true;
+            }
+        }
+    }
+
+    if (pacmanCoordinate.x == blueCoordinate.x && pacmanCoordinate.y == blueCoordinate.y) {
+        if (blueCoordinate.dead) {
+            blueCoordinate.dead = false;
+            blueCoordinate.caught = true;
+        } else {
+            if (pacmanCoordinate.lives != 0) {
+                pacmanCoordinate.lives--;
+            } else {
+                return true;
+            }
+        }
+    }
+
+    if (pacmanCoordinate.x == pinkCoordinate.x && pacmanCoordinate.y == pinkCoordinate.y) {
+        if (pinkCoordinate.dead) {
+            pinkCoordinate.dead = false;
+            pinkCoordinate.caught = true;
+        } else {
+            if (pacmanCoordinate.lives != 0) {
+                pacmanCoordinate.lives--;
+            } else {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool
+findFreePlaceInTrap(ghost &ghostCoordinate, std::vector<CellRoad> &ghostRoad, int &spawnPlace, CellRoad &freePlace) {
+
+
+    int count = 0;
+
+    for (auto road: ghostRoad) {
+        if (spawnPlace < 1) {
+            if (count == 1) {
+                freePlace = road;
+                spawnPlace++;
+                return true;
+            }
+        } else if (spawnPlace < 2) {
+            if (count == 2) {
+                freePlace = road;
+                spawnPlace++;
+                return true;
+            }
+        } else if (spawnPlace < 3) {
+            if (count == 3) {
+                freePlace = road;
+                spawnPlace++;
+                return true;
+            }
+        }
+        count++;
+    }
+
+    return false;
+}
+
+size_t findSpawnPlace(CellRoad &destination, std::vector<CellRoad> &joinedRoad) {
+
+    size_t index = 0;
+
+    auto d = std::find_if(joinedRoad.begin(), joinedRoad.end(), [&cl = destination](const CellRoad &c) {
+        return c.x == cl.x && c.y == cl.y && c.w == cl.w;
+    });
+
+    index = std::distance(joinedRoad.begin(), d);
+
+    return index;
+}
+
+void runningToTrap(ghost &ghostCoordinate, SDL_Rect &ghostRendering) {
+    CellRoad lastElement = ghostCoordinate.roadToTrap.front();
+    CellRoad nextElement = {};
+
+
+    if (ghostCoordinate.roadToTrap.size() > 1) {
+        nextElement = ghostCoordinate.roadToTrap[1];
+
+        if (lastElement.w > 0) {
+            if (lastElement.x <= ghostCoordinate.x && lastElement.x + lastElement.w >= ghostCoordinate.x) {
+
+                if (nextElement.x > ghostCoordinate.x) {
+                    ghostCoordinate.d = RIGHT;
+                } else if (nextElement.x < ghostCoordinate.x) {
+                    ghostCoordinate.d = LEFT;
+                }
+
+                if (ghostCoordinate.x == nextElement.x) {
+                    ghostCoordinate.roadToTrap.erase(ghostCoordinate.roadToTrap.begin());
+                    ghostCoordinate.d = STOP;
+                }
+
+            }
+        } else {
+            if (lastElement.y <= ghostCoordinate.y && lastElement.y + lastElement.h >= ghostCoordinate.y) {
+
+                if (nextElement.y < ghostCoordinate.y) {
+                    ghostCoordinate.d = UP;
+                } else if (nextElement.y > ghostCoordinate.y) {
+                    ghostCoordinate.d = DOWN;
+                }
+
+                if (ghostCoordinate.y == nextElement.y) {
+                    ghostCoordinate.roadToTrap.erase(ghostCoordinate.roadToTrap.begin());
+                    ghostCoordinate.d = STOP;
+                }
+
+            }
+        }
+    } else {
+        if (lastElement.h > 0) {
+            if (ghostCoordinate.y < lastElement.y + lastElement.h) {
+                ghostCoordinate.d = DOWN;
+            } else {
+                ghostCoordinate.d = STOP;
+            }
+        }
+    }
+
+
+    switch (ghostCoordinate.d) {
+        case UP:
+            ghostCoordinate.y--;
+            break;
+        case DOWN:
+            ghostCoordinate.y++;
+            break;
+        case LEFT:
+            ghostCoordinate.x--;
+            break;
+        case RIGHT:
+            ghostCoordinate.x++;
+            break;
+        case STOP:
+            break;
+    }
+
+    ghostRendering.x = ghostCoordinate.x;
+    ghostRendering.y = ghostCoordinate.y;
+}
+
 bool load() {
     using namespace std;
+
     SDL_Surface *temp1;
-
     temp1 = SDL_LoadBMP("/Users/dawid/ClionProjects/PacMan/assets/Pacman.bmp");
-
     if (!temp1) {
         cout << "Error loading image: " << SDL_GetError() << endl;
         system("pause");
         return false;
     }
-
     pacman_bitmap = SDL_CreateTextureFromSurface(renderer, temp1);
     /*pacman_bitmap = SDL_ConvertSurface(temp1, winSurface->format, 0);*/
-
     SDL_FreeSurface(temp1);
-
     if (!pacman_bitmap) {
         cout << "Error Converting surface PacManBitmap" << SDL_GetError() << endl;
         system("pause");
@@ -2289,134 +2822,128 @@ bool load() {
 
 
     SDL_Surface *temp2;
-
     temp2 = SDL_LoadBMP("/Users/dawid/ClionProjects/PacMan/assets/Point.bmp");
-
     if (!temp2) {
         cout << "Error loading image: " << SDL_GetError() << endl;
         system("pause");
         return false;
     }
-
     point_bitmap = SDL_CreateTextureFromSurface(renderer, temp2);
     /*point_bitmap = SDL_ConvertSurface(temp2, winSurface->format, 0);*/
-
     SDL_FreeSurface(temp2);
-
     if (!point_bitmap) {
         cout << "Error Converting surface PointBitmap" << SDL_GetError() << endl;
         system("pause");
         return false;
     }
 
-    Sans = TTF_OpenFont("/System/Library/Fonts/Supplemental/Arial.ttf", 24);
 
+    Sans = TTF_OpenFont("/System/Library/Fonts/Supplemental/Arial.ttf", 24);
     if (!Sans) {
         cout << "Error initialize font : " << TTF_GetError() << endl;
         system("pause");
         return false;
     }
 
-    SDL_Surface *temp3;
 
+    SDL_Surface *temp3;
     SDL_Color White = {255, 255, 255};
     SDL_Color Black = {0, 0, 0};
-
     temp3 = TTF_RenderText(Sans, "SCORE : ", White, Black);
-
     score_message = SDL_CreateTextureFromSurface(renderer, temp3);
-
     SDL_FreeSurface(temp3);
-
     if (!score_message) {
         cout << "Error Converting surface ScoreMesssage" << SDL_GetError() << endl;
         system("pause");
         return false;
     }
 
+
     SDL_Surface *temp4;
-
     temp4 = SDL_LoadBMP("/Users/dawid/ClionProjects/PacMan/assets/Yellow_Ghost.bmp");
-
     if (!temp4) {
         cout << "Error loading image: " << SDL_GetError() << endl;
         system("pause");
         return false;
     }
-
     yellow_ghost = SDL_CreateTextureFromSurface(renderer, temp4);
-
     SDL_FreeSurface(temp4);
 
+
     SDL_Surface *temp5;
-
     temp5 = SDL_LoadBMP("/Users/dawid/ClionProjects/PacMan/assets/Red_Ghost.bmp");
-
     if (!temp5) {
         cout << "Error loading image: " << SDL_GetError() << endl;
         system("pause");
         return false;
     }
-
     red_ghost = SDL_CreateTextureFromSurface(renderer, temp5);
-
     SDL_FreeSurface(temp5);
 
+
     SDL_Surface *temp6;
-
     temp6 = SDL_LoadBMP("/Users/dawid/ClionProjects/PacMan/assets/Pink_Ghost.bmp");
-
     if (!temp6) {
         cout << "Error loading image: " << SDL_GetError() << endl;
         system("pause");
         return false;
     }
-
     pink_ghost = SDL_CreateTextureFromSurface(renderer, temp6);
-
     SDL_FreeSurface(temp6);
 
+
     SDL_Surface *temp7;
-
     temp7 = SDL_LoadBMP("/Users/dawid/ClionProjects/PacMan/assets/Blue_Ghost.bmp");
-
     if (!temp7) {
         cout << "Error loading image: " << SDL_GetError() << endl;
         system("pause");
         return false;
     }
-
     blue_ghost = SDL_CreateTextureFromSurface(renderer, temp7);
-
     SDL_FreeSurface(temp7);
 
+
     SDL_Surface *temp8;
-
     temp8 = SDL_LoadBMP("/Users/dawid/ClionProjects/PacMan/assets/Cherry.bmp");
-
     if (!temp8) {
         cout << "Error loading image: " << SDL_GetError() << endl;
         system("pause");
         return false;
     }
-
     bonus_point = SDL_CreateTextureFromSurface(renderer, temp8);
-
     SDL_FreeSurface(temp8);
 
+
     SDL_Surface *temp9;
-
     temp9 = SDL_LoadBMP("/Users/dawid/ClionProjects/PacMan/assets/Dead_Ghost.bmp");
-
     if (!temp9) {
         cout << "Error loading image: " << SDL_GetError() << endl;
         system("pause");
         return false;
     }
-
     dead_ghost = SDL_CreateTextureFromSurface(renderer, temp9);
-
     SDL_FreeSurface(temp9);
+
+
+    SDL_Surface *temp10;
+    temp10 = SDL_LoadBMP("/Users/dawid/ClionProjects/PacMan/assets/Dead_GhostV2.bmp");
+    if (!temp10) {
+        cout << "Error loading image: " << SDL_GetError() << endl;
+        system("pause");
+        return false;
+    }
+    dead_ghostV2 = SDL_CreateTextureFromSurface(renderer, temp10);
+    SDL_FreeSurface(temp10);
+
+    SDL_Surface *temp11;
+    temp11 = SDL_LoadBMP("/Users/dawid/ClionProjects/PacMan/assets/Ghost_Eyes.bmp");
+    if (!temp11) {
+        cout << "Error loading image: " << SDL_GetError() << endl;
+        system("pause");
+        return false;
+    }
+    ghost_eyes = SDL_CreateTextureFromSurface(renderer, temp11);
+    SDL_FreeSurface(temp11);
 
     return true;
 }
@@ -2457,6 +2984,9 @@ bool init() {
 }
 
 void kill() {
+    SDL_DestroyTexture(ghost_eyes);
+    SDL_DestroyTexture(dead_ghostV2);
+    SDL_DestroyTexture(dead_ghost);
     SDL_DestroyTexture(bonus_point);
     SDL_DestroyTexture(pacman_bitmap);
     SDL_DestroyTexture(yellow_ghost);
