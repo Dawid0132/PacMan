@@ -820,8 +820,14 @@ int main(int argc, char *args[]) {
         if (meetingPacmanWithGhosts(red_ghost_coordinate, yellow_ghost_coordinate,
                                     blue_ghost_coordinate,
                                     pink_ghost_coordinate, pacman, ghostRoad, startGame, direction,
-                                    next_direction, respawn, spawnPlace)) {
-            cout << "End Game!\n";
+                                    next_direction, respawn, spawnPlace) || pointsCoordinates.empty()) {
+            TotalScore = 0;
+            pacman.lives = 2;
+            respawnCharacters(red_ghost_coordinate, yellow_ghost_coordinate, blue_ghost_coordinate,
+                              pink_ghost_coordinate, pacman, ghostRoad, startGame, direction, next_direction, respawn,
+                              spawnPlace);
+            pointsCoordinates = createPoints(road);
+            bonusPointsCoordinates = createBonusPoints(pointsCoordinates, road);
         }
 
 
@@ -890,10 +896,13 @@ int main(int argc, char *args[]) {
         if (!printBoard(bounds_coordinatesLeft, 33, 0, 0, 255)) return -1;
         if (!printGates(trap_gates, 255, 240, 0)) return -1;
 
+
         SDL_RenderCopy(renderer, pacman_bitmap, NULL, &pacmanRender);
         SDL_RenderCopy(renderer, score_message, NULL, &messageRender);
 
+
         renderGhosts(red_ghost_coordinate, yellow_ghost_coordinate, pink_ghost_coordinate, blue_ghost_coordinate);
+
 
         printPoint(pointsCoordinates);
         printBonusPoint(bonusPointsCoordinates);
@@ -909,6 +918,7 @@ int main(int argc, char *args[]) {
         SDL_Delay(10);
 
     }
+
 
     system("pause");
     kill();
@@ -2514,6 +2524,7 @@ void renderGhosts(ghost &redCoordinate, ghost &yelloCoordinate,
 
 }
 
+
 void
 runAwayGhostMode(ghost &ghostCoordinate, std::vector<std::vector<CellRoad>> &neighboursRoad, pacman &pacmanCoordinate,
                  std::vector<CellRoad> &road) {
@@ -2522,6 +2533,7 @@ runAwayGhostMode(ghost &ghostCoordinate, std::vector<std::vector<CellRoad>> &nei
 
     random_device rd;
     mt19937 rdgen(rd());
+
 
     int currentNodeSourceGhost = ghostCoordinate.currentNodeSource;
 
@@ -2612,12 +2624,13 @@ void runningAway(ghost &ghostCoordinate) {
             }
         }
     } else {
-        currentRoad = ghostCoordinate.ghostRunAway.front();
-        ghostCoordinate.ghostRunAway.erase(
+        /*currentRoad = ghostCoordinate.ghostRunAway.front();*/
+        ghostCoordinate.ghostRunAway.clear();
+        /*ghostCoordinate.ghostRunAway.erase(
                 remove_if(ghostCoordinate.ghostRunAway.begin(), ghostCoordinate.ghostRunAway.end(),
                           [currentRoad](const CellRoad &c) {
                               return c.x == currentRoad.x && c.y == currentRoad.y && c.w == currentRoad.w;
-                          }));
+                          }));*/
     }
 
     ghostCoordinate.slowingGhost += 0.5f;
@@ -3101,9 +3114,14 @@ void kill() {
     SDL_DestroyTexture(bonus_point);
     SDL_DestroyTexture(pacman_bitmap);
     SDL_DestroyTexture(yellow_ghost);
+    SDL_DestroyTexture(red_ghost);
+    SDL_DestroyTexture(pink_ghost);
+    SDL_DestroyTexture(blue_ghost);
     SDL_DestroyTexture(point_bitmap);
     SDL_DestroyTexture(score_message);
     SDL_DestroyTexture(scoreCount);
+    delete (Sans);
+    SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     TTF_Quit();
     SDL_Quit();
