@@ -1,9 +1,9 @@
 # PacMan
 
 
-Aby poprawnie skompilować program należy:
-mkdir build
-cd build
-cmake ..
-make
-./Pacman
+Aby poprawnie skompilować program należy:<br />
+mkdir build <br />
+cd build<br />
+cmake ..<br />
+make<br />
+./Pacman<br />
