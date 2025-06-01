@@ -129,13 +129,13 @@ void setGhostsPosition(std::vector<CellRoad> &ghostRoad, ghost_colors c, ghost &
 
 pacman tunnelSwap(pacman &pacman);
 
-void bfs(std::vector<std::vector<CellRoad>> &adjList, int startNode, std::vector<int> &par, std::vector<int> &dist,
+void bfs(std::vector<std::vector<CellRoad> > &adjList, int startNode, std::vector<int> &par, std::vector<int> &dist,
          std::vector<CellRoad> &road, ghost_colors ghostColors);
 
-std::vector<CellRoad> getShortestPath(std::vector<std::vector<CellRoad>> &adjList, int source, int destination,
+std::vector<CellRoad> getShortestPath(std::vector<std::vector<CellRoad> > &adjList, int source, int destination,
                                       std::vector<CellRoad> &road, ghost_colors ghostColors);
 
-std::vector<std::vector<CellRoad>> createGraphWithAllNeighbours(std::vector<CellRoad> &road);
+std::vector<std::vector<CellRoad> > createGraphWithAllNeighbours(std::vector<CellRoad> &road);
 
 void stayInTrap(ghost &ghost, ghost_colors ghostColors, std::vector<CellRoad> &ghostRoad);
 
@@ -163,7 +163,7 @@ void renderGhosts(ghost &redCoordinate, ghost &yelloCoordinate,
                   ghost &pinkCoordinate, ghost &blueCoordinate);
 
 void
-runAwayGhostMode(ghost &ghostCoordinate, std::vector<std::vector<CellRoad>> &neighboursRoad, pacman &pacmanCoordinate,
+runAwayGhostMode(ghost &ghostCoordinate, std::vector<std::vector<CellRoad> > &neighboursRoad, pacman &pacmanCoordinate,
                  std::vector<CellRoad> &road);
 
 void runningAway(ghost &ghostCoordinate);
@@ -269,8 +269,8 @@ int main(int argc, char *args[]) {
     std::vector<Cell> pointsCoordinates;
     std::vector<Cell> bonusPointsCoordinates;
 
-    std::vector<std::vector<CellRoad>> neighboursGraph;
-    std::vector<std::vector<CellRoad>> joinedNeighboursGraph;
+    std::vector<std::vector<CellRoad> > neighboursGraph;
+    std::vector<std::vector<CellRoad> > joinedNeighboursGraph;
 
 
     generateBoard(bounds_coordinatesRight);
@@ -317,7 +317,6 @@ int main(int argc, char *args[]) {
     int playing = 1;
 
     while (playing) {
-
         int currentNodePacMan = 0;
         previousNodePacMan = pacman.currentNodeDestination;
         smooth = 0;
@@ -352,7 +351,6 @@ int main(int argc, char *args[]) {
             case 1:
                 for (auto cellRoad: road) {
                     if (cellRoad.h > 0) {
-
                         if (direction != state) {
                             if (state == 3) {
                                 smooth = pacman.x >= cellRoad.x ? pacman.x - cellRoad.x : 50;
@@ -388,7 +386,6 @@ int main(int argc, char *args[]) {
             case 2:
                 for (auto cellRoad: road) {
                     if (cellRoad.h > 0) {
-
                         if (direction != state) {
                             if (state == 3) {
                                 smooth = pacman.x >= cellRoad.x ? pacman.x - cellRoad.x : 50;
@@ -423,7 +420,6 @@ int main(int argc, char *args[]) {
             case 3:
                 for (auto cellRoad: road) {
                     if (cellRoad.w > 0) {
-
                         if (direction != state) {
                             if (state == 1) {
                                 smooth = pacman.y >= cellRoad.y ? pacman.y - cellRoad.y : 50;
@@ -460,7 +456,6 @@ int main(int argc, char *args[]) {
 
                 for (auto cellRoad: road) {
                     if (cellRoad.w > 0) {
-
                         if (direction != state) {
                             if (state == 1) {
                                 smooth = pacman.y >= cellRoad.y ? pacman.y - cellRoad.y : 50;
@@ -532,7 +527,7 @@ int main(int argc, char *args[]) {
         if (red_ghost_coordinate.dead || pink_ghost_coordinate.dead || blue_ghost_coordinate.dead ||
             yellow_ghost_coordinate.dead) {
             t2 = chrono::high_resolution_clock::now();
-            chrono::duration<int> time_span = chrono::duration_cast<chrono::duration<int >>(t2 - t1);
+            auto time_span = chrono::duration_cast<chrono::duration<int> >(t2 - t1);
 
             if (time_span.count() >= 7) {
                 if (red_ghost_coordinate.dead) {
@@ -588,7 +583,6 @@ int main(int argc, char *args[]) {
         }
 
         if (previousNodePacMan != pacman.currentNodeDestination && startGame) {
-
             if (red_ghost_coordinate.addNewPath) {
                 red_ghost_coordinate.ghostWay = getShortestPath(neighboursGraph, pacman.currentNodeDestination,
                                                                 red_ghost_coordinate.currentNodeSource,
@@ -627,7 +621,6 @@ int main(int argc, char *args[]) {
                 if (!red_ghost_coordinate.readyToLeave) {
                     if (leaveTheTrap(ghostRoad, red_ghost_coordinate,
                                      red_ghost_coordinate.slowingGhost, red_ghost_coordinate.readyToLeave)) {
-
                         escape = !escape;
                         spawnPlace--;
                     }
@@ -835,58 +828,56 @@ int main(int argc, char *args[]) {
         pacmanRender.x = changeRender(pacman.x, WIDTH);
         pacmanRender.y = changeRender(pacman.y, HEIGHT);
 
-        for (auto &point: pointsCoordinates) {
-            if (point.x > pacman.x && point.x < pacman.x + 10 && pacman.y == point.y ||
-                point.x < pacman.x && point.x > pacman.x - 10 && pacman.y == point.y) {
-                pointsCoordinates.erase(
-                        remove_if(pointsCoordinates.begin(), pointsCoordinates.end(), [point](const Cell &c) {
-                            return c.x == point.x && c.y == point.y;
-                        }));
+        auto it = std::remove_if(pointsCoordinates.begin(), pointsCoordinates.end(), [&](const Cell &point) {
+            bool inRangeHorizontally = (point.x > pacman.x && point.x < pacman.x + 10 && pacman.y == point.y) ||
+                                       (point.x < pacman.x && point.x > pacman.x - 10 && pacman.y == point.y);
+            bool inRangeVertically = (point.y > pacman.y && point.y < pacman.y + 10 && pacman.x == point.x) ||
+                                     (point.y < pacman.y && point.y > pacman.y - 10 && pacman.x == point.x);
+
+            if (inRangeHorizontally || inRangeVertically) {
                 TotalScore += 10;
-            } else if (point.y > pacman.y && point.y < pacman.y + 10 && pacman.x == point.x ||
-                       point.y < pacman.y && point.y > pacman.y - 10 && pacman.x == point.x) {
-                pointsCoordinates.erase(
-                        remove_if(pointsCoordinates.begin(), pointsCoordinates.end(), [point](const Cell &c) {
-                            return c.x == point.x && c.y == point.y;
-                        }));
-                TotalScore += 10;
+                return true;
             }
-            if (TotalScore % 1000 == 0) {
-                score_position.w = BAND_HEIGHT;
-            }
+            return false;
+        });
+
+        pointsCoordinates.erase(it, pointsCoordinates.end());
+
+        bool bonusEaten = false;
+
+        auto itBonus = std::remove_if(bonusPointsCoordinates.begin(), bonusPointsCoordinates.end(),
+                                      [&](const Cell &bonusPoint) {
+                                          bool inRangeHorizontally =
+                                                  (bonusPoint.x > pacman.x && bonusPoint.x < pacman.x + 20 && pacman.y
+                                                   == bonusPoint.y) ||
+                                                  (bonusPoint.x < pacman.x && bonusPoint.x > pacman.x - 20 && pacman.y
+                                                   == bonusPoint.y);
+                                          bool inRangeVertically =
+                                                  (bonusPoint.y > pacman.y && bonusPoint.y < pacman.y + 20 && pacman.x
+                                                   == bonusPoint.x) ||
+                                                  (bonusPoint.y < pacman.y && bonusPoint.y > pacman.y - 20 && pacman.x
+                                                   == bonusPoint.x);
+
+                                          if (inRangeHorizontally || inRangeVertically) {
+                                              TotalScore += 100;
+                                              bonusEaten = true;
+                                              return true;
+                                          }
+                                          return false;
+                                      });
+
+        bonusPointsCoordinates.erase(itBonus, bonusPointsCoordinates.end());
+
+
+        if (bonusEaten) {
+            setDeadAllGhosts(red_ghost_coordinate, yellow_ghost_coordinate, blue_ghost_coordinate,
+                             pink_ghost_coordinate);
+            t1 = chrono::high_resolution_clock::now();
         }
 
-        for (auto &bonusPoint: bonusPointsCoordinates) {
-
-            if (bonusPoint.x > pacman.x && bonusPoint.x < pacman.x + 10 && pacman.y == bonusPoint.y ||
-                bonusPoint.x < pacman.x && bonusPoint.x > pacman.x - 10 && pacman.y == bonusPoint.y) {
-                TotalScore += 100;
-                bonusPointsCoordinates.erase(
-                        remove_if(bonusPointsCoordinates.begin(), bonusPointsCoordinates.end(),
-                                  [bonusPoint](const Cell &c) {
-                                      return c.x == bonusPoint.x && c.y == bonusPoint.y;
-                                  }));
-                setDeadAllGhosts(red_ghost_coordinate, yellow_ghost_coordinate, blue_ghost_coordinate,
-                                 pink_ghost_coordinate);
-                t1 = chrono::high_resolution_clock::now();
-            } else if (bonusPoint.y > pacman.y && bonusPoint.y < pacman.y + 10 && pacman.x == bonusPoint.x ||
-                       bonusPoint.y < pacman.y && bonusPoint.y > pacman.y - 10 && pacman.x == bonusPoint.x) {
-                TotalScore += 100;
-                bonusPointsCoordinates.erase(
-                        remove_if(bonusPointsCoordinates.begin(), bonusPointsCoordinates.end(),
-                                  [bonusPoint](const Cell &c) {
-                                      return c.x == bonusPoint.x && c.y == bonusPoint.y;
-                                  }));
-                setDeadAllGhosts(red_ghost_coordinate, yellow_ghost_coordinate, blue_ghost_coordinate,
-                                 pink_ghost_coordinate);
-                t1 = chrono::high_resolution_clock::now();
-            }
-
-            if (TotalScore % 1000 == 0) {
-                score_position.w = BAND_HEIGHT;
-            }
+        if (TotalScore % 1000 == 0) {
+            score_position.w = BAND_HEIGHT;
         }
-
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
 
@@ -916,7 +907,6 @@ int main(int argc, char *args[]) {
 
         SDL_RenderPresent(renderer);
         SDL_Delay(10);
-
     }
 
 
@@ -1178,7 +1168,7 @@ std::vector<CellRoad> generateRoad(SDL_Rect *rectsBoard, int length) {
         } else if (count >= 9 && count <= 22) {
             if (count <= 20) {
                 if (count >= 9 && count <= 12) {
-                    if (count< 11) {
+                    if (count < 11) {
                         if (count % 2 != 0) {
                             roadElement.x += BAND_HEIGHT / 2;
                             roadElement.y += BAND_HEIGHT / 2;
@@ -1227,9 +1217,8 @@ std::vector<CellRoad> generateRoad(SDL_Rect *rectsBoard, int length) {
                     roadElement.w = BAND_HEIGHT / 2 + BAND_WIDTH;
                 }
             }
-
         } else if (count >= 23 && count <= 26) {
-            if (count< 25) {
+            if (count < 25) {
                 if (count % 2 != 0) {
                     roadElement.y -= BAND_HEIGHT / 2;
                     roadElement.x -= BAND_HEIGHT / 2;
@@ -1253,7 +1242,7 @@ std::vector<CellRoad> generateRoad(SDL_Rect *rectsBoard, int length) {
                 }
             }
         } else if (count >= 27 && count <= 32) {
-            if (count< 30) {
+            if (count < 30) {
                 if (roadElement.w > BAND_WIDTH) {
                     if (count % 2 == 0) {
                         roadElement.x += BAND_HEIGHT + BAND_HEIGHT / 2 + BAND_WIDTH;
@@ -1268,7 +1257,6 @@ std::vector<CellRoad> generateRoad(SDL_Rect *rectsBoard, int length) {
                     roadElement.x += BAND_HEIGHT / 2;
                     roadElement.h = 2 * BAND_HEIGHT;
                 }
-
             } else {
                 if (roadElement.w > BAND_WIDTH) {
                     if (count % 2 == 0) {
@@ -1367,67 +1355,50 @@ std::vector<Cell> createBonusPoints(std::vector<Cell> &pointsCoordinate, std::ve
     int setFirstCherry = 0;
     int setSecondCherry = 0;
     int setThirdCherry = 0;
-    int setFourthCherry = 0;
-
     int removePoint = 0;
-
 
     for (auto &point: pointsCoordinate) {
         Cell bonus;
+
         if (point.x == 160 && point.y >= 80 && point.y <= 110) {
             if (setFirstCherry == 0) {
-                bonus.x = point.x;
-                bonus.y = point.y;
+                bonus = point;
                 pointsRemoved.push_back(bonus);
                 bonusPointsCoordinate.push_back(bonus);
             }
-
             setFirstCherry++;
-        }
-
-        if (point.x == 480 && point.y >= 80 && point.y < 140) {
+        } else if (point.x == 480 && point.y >= 80 && point.y < 140) {
             if (setThirdCherry == 0) {
-                bonus.x = point.x;
-                bonus.y = point.y;
+                bonus = point;
                 pointsRemoved.push_back(bonus);
                 bonusPointsCoordinate.push_back(bonus);
             }
             setThirdCherry++;
-        }
-
-        if (point.x > 480 && point.x < 640 && point.y == 80) {
+        } else if (point.x > 480 && point.x < 640 && point.y == 80) {
             if (removePoint == 0) {
-                bonus.x = point.x;
-                bonus.y = point.y;
+                bonus = point;
                 pointsRemoved.push_back(bonus);
             }
             removePoint++;
-        }
-
-        if (point.x >= 30 && point.x < 225 && point.y == 615) {
+        } else if (point.x >= 30 && point.x < 225 && point.y == 615) {
+            bonus = point;
             if (setSecondCherry == 0) {
-                bonus.x = point.x;
-                bonus.y = point.y;
                 pointsRemoved.push_back(bonus);
                 bonusPointsCoordinate.push_back(bonus);
-            }
-
-            if (setSecondCherry != 0 && setSecondCherry < 2) {
-                bonus.x = point.x;
-                bonus.y = point.y;
+            } else if (setSecondCherry < 2) {
                 pointsRemoved.push_back(bonus);
             }
-
             setSecondCherry++;
-        }
-
-        if (point.x >= 415 && point.x <= 610 && point.y == 615) {
-            if (pointsCoordinate[index + 1].x >= 415 && pointsCoordinate[index + 1].x <= 610 &&
-                pointsCoordinate[index + 1].y == 615) {
-
+        } else if (point.x >= 415 && point.x <= 610 && point.y == 615) {
+            if (index + 1 < static_cast<int>(pointsCoordinate.size())) {
+                const auto &nextPoint = pointsCoordinate[index + 1];
+                if (!(nextPoint.x >= 415 && nextPoint.x <= 610 && nextPoint.y == 615)) {
+                    bonus = point;
+                    pointsRemoved.push_back(bonus);
+                    bonusPointsCoordinate.push_back(bonus);
+                }
             } else {
-                bonus.x = point.x;
-                bonus.y = point.y;
+                bonus = point;
                 pointsRemoved.push_back(bonus);
                 bonusPointsCoordinate.push_back(bonus);
             }
@@ -1436,10 +1407,12 @@ std::vector<Cell> createBonusPoints(std::vector<Cell> &pointsCoordinate, std::ve
         index++;
     }
 
-    for (auto pointIndex: pointsRemoved) {
-        pointsCoordinate.erase(remove_if(pointsCoordinate.begin(), pointsCoordinate.end(), [pointIndex](const Cell &c) {
-            return c.x == pointIndex.x && c.y == pointIndex.y;
-        }));
+    for (const auto &pointToRemove: pointsRemoved) {
+        auto newEnd = remove_if(pointsCoordinate.begin(), pointsCoordinate.end(),
+                                [&pointToRemove](const Cell &c) {
+                                    return c.x == pointToRemove.x && c.y == pointToRemove.y;
+                                });
+        pointsCoordinate.erase(newEnd, pointsCoordinate.end());
     }
 
     return bonusPointsCoordinate;
@@ -1502,7 +1475,6 @@ std::vector<CellRoad> createTrapRoad(SDL_Rect *rectL, SDL_Rect *rectR, int lengt
 }
 
 std::vector<CellRoad> joinGhostRoadWithPacManRoad(std::vector<CellRoad> rp, std::vector<CellRoad> rg) {
-
     using namespace std;
 
     std::vector<CellRoad> completeRoad = rg;
@@ -1528,11 +1500,10 @@ std::vector<CellRoad> joinGhostRoadWithPacManRoad(std::vector<CellRoad> rp, std:
     return completeRoad;
 }
 
-std::vector<std::vector<CellRoad>> createGraphWithAllNeighbours(std::vector<CellRoad> &road) {
-
+std::vector<std::vector<CellRoad> > createGraphWithAllNeighbours(std::vector<CellRoad> &road) {
     using namespace std;
 
-    vector<vector<CellRoad>> adjList(road.size());
+    vector<vector<CellRoad> > adjList(road.size());
 
     int count = 0;
 
@@ -1612,13 +1583,10 @@ void setGhostsPosition(std::vector<CellRoad> &ghostRoad, ghost_colors c, ghost &
     }
 
     ghostCoordinate.d = DOWN;
-
 }
 
-void bfs(std::vector<std::vector<CellRoad>> &adjList, int startNode, std::vector<int> &par, std::vector<int> &dist,
+void bfs(std::vector<std::vector<CellRoad> > &adjList, int startNode, std::vector<int> &par, std::vector<int> &dist,
          std::vector<CellRoad> &road, ghost_colors ghostColors) {
-
-
     CellRoad parent = road.at(startNode);
 
     int node = startNode;
@@ -1673,13 +1641,11 @@ void bfs(std::vector<std::vector<CellRoad>> &adjList, int startNode, std::vector
 
 
     while (!queue.empty()) {
-
         int currentNode = queue.front();
         queue.erase(queue.begin());
 
 
         for (CellRoad neighbour: adjList[currentNode]) {
-
             int count = 0;
 
             for (auto cell: road) {
@@ -1696,9 +1662,8 @@ void bfs(std::vector<std::vector<CellRoad>> &adjList, int startNode, std::vector
     }
 }
 
-std::vector<CellRoad> getShortestPath(std::vector<std::vector<CellRoad>> &adjList, int source, int destination,
+std::vector<CellRoad> getShortestPath(std::vector<std::vector<CellRoad> > &adjList, int source, int destination,
                                       std::vector<CellRoad> &road, ghost_colors ghostColors) {
-
     using namespace std;
 
     vector<int> par(adjList.size(), -1);
@@ -1751,38 +1716,26 @@ void printPoint(const std::vector<Cell> &pointsCoordinates) {
         points[count].h = 10;
         SDL_RenderCopy(renderer, point_bitmap, NULL, &points[count]);
     }
-
 }
 
 void printBonusPoint(const std::vector<Cell> &bonusPointsCoordinates) {
     using namespace std;
 
-    int length = (int) bonusPointsCoordinates.size();
-    SDL_Rect points[length];
+    for (const auto &point: bonusPointsCoordinates) {
+        SDL_Rect rect;
 
-    int count = 0;
-
-    /*for (auto &bonus: bonusPointsCoordinate) {
-        if (bonus.y == 80) {
-            bonus.y -= 3 * BAND_WIDTH;
-            bonus.x -= 2 * BAND_WIDTH;
-        } else {
-            bonus.y -= 3 * BAND_WIDTH;
-        }
-    }*/
-
-
-    for (auto point: bonusPointsCoordinates) {
         if (point.y == 80) {
-            points[count].x = point.x - 3 * BAND_WIDTH;
-            points[count].y = point.y - 2 * BAND_WIDTH;
+            rect.x = point.x - 3 * BAND_WIDTH;
+            rect.y = point.y - 2 * BAND_WIDTH;
         } else {
-            points[count].x = point.x;
-            points[count].y = point.y - 3 * BAND_WIDTH;
+            rect.x = point.x;
+            rect.y = point.y - 3 * BAND_WIDTH;
         }
-        points[count].w = 30;
-        points[count].h = 30;
-        SDL_RenderCopy(renderer, bonus_point, NULL, &points[count]);
+
+        rect.w = 30;
+        rect.h = 30;
+
+        SDL_RenderCopy(renderer, bonus_point, NULL, &rect);
     }
 }
 
@@ -1797,7 +1750,6 @@ bool printBoard(SDL_Rect *rects, int count, Uint8 r, Uint8 g, Uint8 b) {
 }
 
 bool printScore(int TotalScore) {
-
     using namespace std;
 
     SDL_Surface *score;
@@ -1835,17 +1787,18 @@ bool printGates(SDL_Rect gates, Uint8 r, Uint8 g, Uint8 b) {
 }
 
 void generateBoard(SDL_Rect *rects) {
-
     using namespace std;
 
     int count = 0;
     int previousY = 0;
     int previousX = 0;
 
-    struct Cell endBoard[4][1] = {{BOARD_START + BAND_HEIGHT,    WINDOW_WIDTH - BAND_WIDTH},
-                                  {8 * BAND_HEIGHT - BAND_WIDTH, WINDOW_WIDTH - BAND_WIDTH},
-                                  {WINDOW_HEIGHT,                WINDOW_WIDTH / 2},
-                                  {BOARD_START,                  WINDOW_WIDTH / 2}};
+    struct Cell endBoard[4][1] = {
+        {BOARD_START + BAND_HEIGHT, WINDOW_WIDTH - BAND_WIDTH},
+        {8 * BAND_HEIGHT - BAND_WIDTH, WINDOW_WIDTH - BAND_WIDTH},
+        {WINDOW_HEIGHT, WINDOW_WIDTH / 2},
+        {BOARD_START, WINDOW_WIDTH / 2}
+    };
 
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 1; ++j) {
@@ -1876,17 +1829,16 @@ void generateBoard(SDL_Rect *rects) {
     }
 
     struct Cell cellsTwo[5][2] = {
-            {0, 3, 0,  4},
-            {1, 0, 2,  0},
-            {2, 1, 2,  2},
-            {0, 2, 1,  2},
-            {9, 1, 10, 1}
+        {0, 3, 0, 4},
+        {1, 0, 2, 0},
+        {2, 1, 2, 2},
+        {0, 2, 1, 2},
+        {9, 1, 10, 1}
     };
 
 
     for (int j = 0; j < 5; ++j) {
         for (int k = 0; k < 2; ++k) {
-
             if (k != 0) {
                 SDL_Rect band;
                 if (previousX < cellsTwo[j][k].x) {
@@ -1896,14 +1848,15 @@ void generateBoard(SDL_Rect *rects) {
                     band.h = BAND_WIDTH;
                 } else if (previousY < cellsTwo[j][k].y) {
                     band.x = previousX * 64 + WINDOW_WIDTH / 2;
-                    band.y = (j > 2) ? previousY * 60 + BOARD_SCORE_HEIGHT : previousY * 60 +
-                                                                             BOARD_SCORE_HEIGHT + BAND_HEIGHT;
+                    band.y = (j > 2)
+                                 ? previousY * 60 + BOARD_SCORE_HEIGHT
+                                 : previousY * 60 +
+                                   BOARD_SCORE_HEIGHT + BAND_HEIGHT;
                     band.w = BAND_WIDTH;
                     band.h = BAND_HEIGHT;
                 }
                 rects[count] = band;
                 ++count;
-
             }
             previousY = cellsTwo[j][k].y;
             previousX = cellsTwo[j][k].x;
@@ -1911,13 +1864,13 @@ void generateBoard(SDL_Rect *rects) {
     }
 
     struct Cell cellsThree[7][2] = {
-            {7, 0, 7, 0},
-            {7, 2, 7, 2},
-            {7, 4, 8, 3},
-            {5, 0, 6, 0},
-            {3, 4, 4, 3},
-            {2, 3, 3, 2},
-            {0, 1, 0, 0},
+        {7, 0, 7, 0},
+        {7, 2, 7, 2},
+        {7, 4, 8, 3},
+        {5, 0, 6, 0},
+        {3, 4, 4, 3},
+        {2, 3, 3, 2},
+        {0, 1, 0, 0},
     };
 
 
@@ -1965,8 +1918,8 @@ void generateBoard(SDL_Rect *rects) {
 
 
     struct Cell cellsFour[2][2] = {
-            {1, 2, 1, 4},
-            {4, 2, 5, 1},
+        {1, 2, 1, 4},
+        {4, 2, 5, 1},
     };
 
     for (int j = 0; j < 2; ++j) {
@@ -2008,8 +1961,10 @@ void generateBoard(SDL_Rect *rects) {
         }
     }
 
-    struct Cell trap[2][3] = {{3, 0, 4, 0, 3, 1},
-                              {5, 3, 6, 3, 5, 3}};
+    struct Cell trap[2][3] = {
+        {3, 0, 4, 0, 3, 1},
+        {5, 3, 6, 3, 5, 3}
+    };
 
     for (int i = 0; i < 2; ++i) {
         for (int j = 0; j < 3; ++j) {
@@ -2022,9 +1977,11 @@ void generateBoard(SDL_Rect *rects) {
             } else {
                 switch (i) {
                     case 0:
-                        band.x = (j == 1) ? trap[i][j].x * 64 + WINDOW_WIDTH / 2 : trap[i][j].x * 64 +
-                                                                                   WINDOW_WIDTH / 2 +
-                                                                                   BAND_HEIGHT / 2;
+                        band.x = (j == 1)
+                                     ? trap[i][j].x * 64 + WINDOW_WIDTH / 2
+                                     : trap[i][j].x * 64 +
+                                       WINDOW_WIDTH / 2 +
+                                       BAND_HEIGHT / 2;
                         band.y = trap[i][j].y * 60 + BOARD_SCORE_HEIGHT + BAND_HEIGHT;
                         band.w = (j == 1) ? BAND_HEIGHT + BAND_WIDTH : BAND_HEIGHT / 2 + BAND_WIDTH;
                         band.h = BAND_WIDTH;
@@ -2047,11 +2004,9 @@ void generateBoard(SDL_Rect *rects) {
             ++count;
         }
     }
-
 }
 
 void x_axis_Board(SDL_Rect *rectsBoardRight, SDL_Rect *rectsBoardLeft, int length) {
-
     for (int i = 0; i < length; ++i) {
         *(rectsBoardLeft + i) = *(rectsBoardRight + i);
     }
@@ -2064,12 +2019,9 @@ void x_axis_Board(SDL_Rect *rectsBoardRight, SDL_Rect *rectsBoardLeft, int lengt
             rectsBoardLeft[i].x = WINDOW_WIDTH - (rectsBoardLeft[i].x + BAND_WIDTH);
         }
     }
-
-
 }
 
 void stayInTrap(ghost &ghost, ghost_colors ghostColors, std::vector<CellRoad> &ghostRoad) {
-
     int count = 0;
 
     for (auto ghostPosition: ghostRoad) {
@@ -2115,13 +2067,11 @@ void stayInTrap(ghost &ghost, ghost_colors ghostColors, std::vector<CellRoad> &g
             ghost.y++;
             break;
     }
-
 }
 
 bool
 leaveTheTrap(std::vector<CellRoad> &ghostRoad, ghost &ghostCoordinate, float &slowMoving,
              bool &readyToLeave) {
-
     using namespace std;
 
     CellRoad exitTrap = ghostRoad.at(4);
@@ -2188,11 +2138,9 @@ leaveTheTrap(std::vector<CellRoad> &ghostRoad, ghost &ghostCoordinate, float &sl
 }
 
 void setSourceNodeGhost(ghost &ghostCoordinate, std::vector<CellRoad> &road) {
-
     int count = 0;
 
     for (auto currentNode: road) {
-
         if (ghostCoordinate.x >= currentNode.x && ghostCoordinate.x <= currentNode.x + currentNode.w &&
             ghostCoordinate.y == currentNode.y) {
             ghostCoordinate.currentNodeSource = count;
@@ -2206,8 +2154,6 @@ void setSourceNodeGhost(ghost &ghostCoordinate, std::vector<CellRoad> &road) {
 
 void ghostMoving(std::vector<CellRoad> &ghostWay, ghost &ghostCoordinate,
                  pacman &pacmanCoordinate, bool &addNewPath) {
-
-
     CellRoad lastElement = ghostWay.front();
     CellRoad nextElement = {};
 
@@ -2217,7 +2163,6 @@ void ghostMoving(std::vector<CellRoad> &ghostWay, ghost &ghostCoordinate,
 
         if (lastElement.w > 0) {
             if (lastElement.x <= ghostCoordinate.x && lastElement.x + lastElement.w >= ghostCoordinate.x) {
-
                 if (nextElement.x > ghostCoordinate.x) {
                     ghostCoordinate.d = RIGHT;
                 } else if (nextElement.x < ghostCoordinate.x) {
@@ -2229,11 +2174,9 @@ void ghostMoving(std::vector<CellRoad> &ghostWay, ghost &ghostCoordinate,
                     ghostCoordinate.d = STOP;
                     addNewPath = true;
                 }
-
             }
         } else {
             if (lastElement.y <= ghostCoordinate.y && lastElement.y + lastElement.h >= ghostCoordinate.y) {
-
                 if (nextElement.y < ghostCoordinate.y) {
                     ghostCoordinate.d = UP;
                 } else if (nextElement.y > ghostCoordinate.y) {
@@ -2245,7 +2188,6 @@ void ghostMoving(std::vector<CellRoad> &ghostWay, ghost &ghostCoordinate,
                     ghostCoordinate.d = STOP;
                     addNewPath = true;
                 }
-
             }
         }
     } else {
@@ -2281,13 +2223,10 @@ void ghostMoving(std::vector<CellRoad> &ghostWay, ghost &ghostCoordinate,
         case STOP:
             break;
     }
-
-
 }
 
 bool escapeFromTrap(ghost &ghostCoordinate, std::vector<CellRoad> &road, bool &escape,
                     bool &escaped) {
-
     for (auto cell: road) {
         if (ghostCoordinate.x >= cell.x && ghostCoordinate.x <= cell.x + cell.w && ghostCoordinate.y == cell.y) {
             if (cell.w > 0) {
@@ -2323,8 +2262,6 @@ bool escapeFromTrap(ghost &ghostCoordinate, std::vector<CellRoad> &road, bool &e
 }
 
 void movingInTrap(ghost &blinky, ghost &pinky, ghost &inky, ghost &clyde, std::vector<CellRoad> &ghostRoad) {
-
-
     int temp = 0;
 
     for (auto road: ghostRoad) {
@@ -2349,11 +2286,9 @@ void movingInTrap(ghost &blinky, ghost &pinky, ghost &inky, ghost &clyde, std::v
     if (clyde.trapped) {
         stayInTrap(clyde, YELLOW, ghostRoad);
     }
-
 }
 
 bool setEscapePosition(ghost &any, std::vector<CellRoad> &ghostRoad, bool &readyToEscape) {
-
     for (auto road: ghostRoad) {
         if (road.h < 45) {
             if (any.x >= road.x && any.x <= road.x + road.w && any.y >= road.y && any.y <= road.y + road.h) {
@@ -2380,8 +2315,6 @@ bool setEscapePosition(ghost &any, std::vector<CellRoad> &ghostRoad, bool &ready
 }
 
 void increaseCountGhosts(int totalScore, ghost &blinky, ghost &pinky, ghost &inky, ghost &clyde) {
-
-
     if (totalScore >= 300 && totalScore < 400 && pinky.trapped) {
         pinky.trapped = false;
     } else if (totalScore >= 400 && totalScore < 500 && inky.trapped) {
@@ -2389,7 +2322,6 @@ void increaseCountGhosts(int totalScore, ghost &blinky, ghost &pinky, ghost &ink
     } else if (totalScore >= 500 && totalScore < 600 && clyde.trapped) {
         clyde.trapped = false;
     }
-
 }
 
 void setDeadAllGhosts(ghost &red, ghost &yellow, ghost &blue, ghost &pink) {
@@ -2411,7 +2343,6 @@ void setDeadAllGhosts(ghost &red, ghost &yellow, ghost &blue, ghost &pink) {
 }
 
 int changeRender(int coordinate, coordinates c) {
-
     int position = 0;
 
     switch (c) {
@@ -2433,7 +2364,6 @@ int changeRender(int coordinate, coordinates c) {
 }
 
 pacman tunnelSwap(pacman &PacMan) {
-
     pacman pacman1 = PacMan;
 
     int tunnelDirect = 0;
@@ -2458,7 +2388,6 @@ pacman tunnelSwap(pacman &PacMan) {
 
 void renderGhosts(ghost &redCoordinate, ghost &yelloCoordinate,
                   ghost &pinkCoordinate, ghost &blueCoordinate) {
-
     SDL_Rect redRender = {changeRender(redCoordinate.x, WIDTH), changeRender(redCoordinate.y, HEIGHT), 30, 30};
     SDL_Rect yellowRender = {changeRender(yelloCoordinate.x, WIDTH), changeRender(yelloCoordinate.y, HEIGHT), 30, 30};
     SDL_Rect blueRender = {changeRender(blueCoordinate.x, WIDTH), changeRender(blueCoordinate.y, HEIGHT), 30, 30};
@@ -2504,7 +2433,6 @@ void renderGhosts(ghost &redCoordinate, ghost &yelloCoordinate,
             SDL_RenderCopy(renderer, ghost_eyes, NULL, &blueRender);
         } else {
             SDL_RenderCopy(renderer, blue_ghost, NULL, &blueRender);
-
         }
     }
 
@@ -2521,14 +2449,12 @@ void renderGhosts(ghost &redCoordinate, ghost &yelloCoordinate,
             SDL_RenderCopy(renderer, pink_ghost, NULL, &pinkRender);
         }
     }
-
 }
 
 
 void
-runAwayGhostMode(ghost &ghostCoordinate, std::vector<std::vector<CellRoad>> &neighboursRoad, pacman &pacmanCoordinate,
+runAwayGhostMode(ghost &ghostCoordinate, std::vector<std::vector<CellRoad> > &neighboursRoad, pacman &pacmanCoordinate,
                  std::vector<CellRoad> &road) {
-
     using namespace std;
 
     random_device rd;
@@ -2540,44 +2466,84 @@ runAwayGhostMode(ghost &ghostCoordinate, std::vector<std::vector<CellRoad>> &nei
 
     ghostCoordinate.ghostRunAway.push_back(road.at(currentNodeSourceGhost));
 
-    int count = 0;
-    int key = true;
+    const int maxAttempts = 10;
+    const int stepsToChoose = 5;
 
-    CellRoad nextNeighbour = {};
+    for (int i = 0; i < stepsToChoose; ++i) {
+        bool foundNext = false;
+        int attempts = 0;
 
-    for (int i = 0; i < 5; ++i) {
+        while (!foundNext && attempts < maxAttempts) {
+            ++attempts;
 
-        key = true;
+            if (neighboursRoad[currentNodeSourceGhost].empty())
+                break;
 
-        while (key) {
-            count = 0;
-            uniform_int_distribution<size_t> d{0, neighboursRoad[currentNodeSourceGhost].size()};
+            uniform_int_distribution<size_t> d{0, neighboursRoad[currentNodeSourceGhost].size() - 1};
+            CellRoad nextNeighbour = neighboursRoad[currentNodeSourceGhost][d(rdgen)];
 
-            nextNeighbour = neighboursRoad[currentNodeSourceGhost][d(rdgen)];
 
-            for (auto &cellRoad: road) {
-                if (nextNeighbour.x == cellRoad.x && nextNeighbour.y == cellRoad.y && nextNeighbour.w == cellRoad.w) {
-                    if (count != pacmanCoordinate.currentNodeDestination) {
-                        if (std::find_if(ghostCoordinate.ghostRunAway.begin(), ghostCoordinate.ghostRunAway.end(),
-                                         [&cr = cellRoad](const CellRoad &c) {
-                                             return cr.x == c.x && cr.y == c.y && c.w == cr.w;
-                                         }) != ghostCoordinate.ghostRunAway.end()) {
+            auto it = std::find_if(road.begin(), road.end(), [&nextNeighbour](const CellRoad &c) {
+                return c.x == nextNeighbour.x && c.y == nextNeighbour.y && c.w == nextNeighbour.w;
+            });
 
-                        } else {
-                            ghostCoordinate.ghostRunAway.push_back(nextNeighbour);
-                            currentNodeSourceGhost = count;
-                            key = false;
-                        }
+            if (it != road.end()) {
+                int indexInRoad = std::distance(road.begin(), it);
+
+                if (indexInRoad != pacmanCoordinate.currentNodeDestination) {
+                    if (std::none_of(ghostCoordinate.ghostRunAway.begin(), ghostCoordinate.ghostRunAway.end(),
+                                     [&nextNeighbour](const CellRoad &c) {
+                                         return c.x == nextNeighbour.x && c.y == nextNeighbour.y && c.w == nextNeighbour
+                                                .w;
+                                     })) {
+                        ghostCoordinate.ghostRunAway.push_back(nextNeighbour);
+                        currentNodeSourceGhost = indexInRoad;
+                        foundNext = true;
                     }
                 }
-                count++;
             }
         }
+
+        if (!foundNext) {
+            break;
+        }
     }
+
+    // int count = 0;
+    // int key = true;
+
+    // CellRoad nextNeighbour = {};
+
+    // for (int i = 0; i < 5; ++i) {
+    //     key = true;
+    //
+    //     while (key) {
+    //         count = 0;
+    //         uniform_int_distribution<size_t> d{0, neighboursRoad[currentNodeSourceGhost].size() - 1};
+    //
+    //         nextNeighbour = neighboursRoad[currentNodeSourceGhost][d(rdgen)];
+    //
+    //         for (auto &cellRoad: road) {
+    //             if (nextNeighbour.x == cellRoad.x && nextNeighbour.y == cellRoad.y && nextNeighbour.w == cellRoad.w) {
+    //                 if (count != pacmanCoordinate.currentNodeDestination) {
+    //                     if (std::find_if(ghostCoordinate.ghostRunAway.begin(), ghostCoordinate.ghostRunAway.end(),
+    //                                      [&cr = cellRoad](const CellRoad &c) {
+    //                                          return cr.x == c.x && cr.y == c.y && c.w == cr.w;
+    //                                      }) != ghostCoordinate.ghostRunAway.end()) {
+    //                     } else {
+    //                         ghostCoordinate.ghostRunAway.push_back(nextNeighbour);
+    //                         currentNodeSourceGhost = count;
+    //                         key = false;
+    //                     }
+    //                 }
+    //             }
+    //             count++;
+    //         }
+    //     }
+    // }
 }
 
 void runningAway(ghost &ghostCoordinate) {
-
     CellRoad currentRoad = {};
     CellRoad nextRoad = {};
 
@@ -2587,7 +2553,6 @@ void runningAway(ghost &ghostCoordinate) {
 
         if (currentRoad.w > 0) {
             if (currentRoad.x <= ghostCoordinate.x && currentRoad.x + currentRoad.w >= ghostCoordinate.x) {
-
                 if (nextRoad.x > ghostCoordinate.x) {
                     ghostCoordinate.d = RIGHT;
                 } else if (nextRoad.x < ghostCoordinate.x) {
@@ -2596,16 +2561,15 @@ void runningAway(ghost &ghostCoordinate) {
 
                 if (ghostCoordinate.x == nextRoad.x) {
                     ghostCoordinate.ghostRunAway.erase(
-                            remove_if(ghostCoordinate.ghostRunAway.begin(), ghostCoordinate.ghostRunAway.end(),
-                                      [currentRoad](const CellRoad &c) {
-                                          return c.x == currentRoad.x && c.y == currentRoad.y && c.w == currentRoad.w;
-                                      }));
+                        remove_if(ghostCoordinate.ghostRunAway.begin(), ghostCoordinate.ghostRunAway.end(),
+                                  [currentRoad](const CellRoad &c) {
+                                      return c.x == currentRoad.x && c.y == currentRoad.y && c.w == currentRoad.w;
+                                  }));
                     ghostCoordinate.d = STOP;
                 }
             }
         } else {
             if (currentRoad.y <= ghostCoordinate.y && currentRoad.y + currentRoad.h >= ghostCoordinate.y) {
-
                 if (nextRoad.y < ghostCoordinate.y) {
                     ghostCoordinate.d = UP;
                 } else if (nextRoad.y > ghostCoordinate.y) {
@@ -2614,13 +2578,12 @@ void runningAway(ghost &ghostCoordinate) {
 
                 if (ghostCoordinate.y == nextRoad.y) {
                     ghostCoordinate.ghostRunAway.erase(
-                            remove_if(ghostCoordinate.ghostRunAway.begin(), ghostCoordinate.ghostRunAway.end(),
-                                      [currentRoad](const CellRoad &c) {
-                                          return c.x == currentRoad.x && c.y == currentRoad.y && c.w == currentRoad.w;
-                                      }));
+                        remove_if(ghostCoordinate.ghostRunAway.begin(), ghostCoordinate.ghostRunAway.end(),
+                                  [currentRoad](const CellRoad &c) {
+                                      return c.x == currentRoad.x && c.y == currentRoad.y && c.w == currentRoad.w;
+                                  }));
                     ghostCoordinate.d = STOP;
                 }
-
             }
         }
     } else {
@@ -2659,14 +2622,12 @@ void runningAway(ghost &ghostCoordinate) {
         case STOP:
             break;
     }
-
 }
 
 bool
 meetingPacmanWithGhosts(ghost &redCoordinate, ghost &yellowCoordinate, ghost &blueCoordinate, ghost &pinkCoordinate,
                         pacman &pacmanCoordinate, std::vector<CellRoad> &ghostRoad, bool &startGame, int &direction,
                         int &nextDirection, bool &respawn, int &spawnPlace) {
-
     if (pacmanCoordinate.x == redCoordinate.x && pacmanCoordinate.y == redCoordinate.y) {
         if (redCoordinate.dead) {
             redCoordinate.slowingGhost = 0.0f;
@@ -2744,8 +2705,6 @@ meetingPacmanWithGhosts(ghost &redCoordinate, ghost &yellowCoordinate, ghost &bl
 
 bool
 findFreePlaceInTrap(ghost &ghostCoordinate, std::vector<CellRoad> &ghostRoad, int &spawnPlace, CellRoad &freePlace) {
-
-
     int count = 0;
 
     for (auto road: ghostRoad) {
@@ -2775,7 +2734,6 @@ findFreePlaceInTrap(ghost &ghostCoordinate, std::vector<CellRoad> &ghostRoad, in
 }
 
 size_t findSpawnPlace(CellRoad &destination, std::vector<CellRoad> &joinedRoad) {
-
     size_t index = 0;
 
     auto d = std::find_if(joinedRoad.begin(), joinedRoad.end(), [&cl = destination](const CellRoad &c) {
@@ -2797,7 +2755,6 @@ void runningToTrap(ghost &ghostCoordinate) {
 
         if (lastElement.w > 0) {
             if (lastElement.x <= ghostCoordinate.x && lastElement.x + lastElement.w >= ghostCoordinate.x) {
-
                 if (nextElement.x > ghostCoordinate.x) {
                     ghostCoordinate.d = RIGHT;
                 } else if (nextElement.x < ghostCoordinate.x) {
@@ -2808,11 +2765,9 @@ void runningToTrap(ghost &ghostCoordinate) {
                     ghostCoordinate.roadToTrap.erase(ghostCoordinate.roadToTrap.begin());
                     ghostCoordinate.d = STOP;
                 }
-
             }
         } else {
             if (lastElement.y <= ghostCoordinate.y && lastElement.y + lastElement.h >= ghostCoordinate.y) {
-
                 if (nextElement.y < ghostCoordinate.y) {
                     ghostCoordinate.d = UP;
                 } else if (nextElement.y > ghostCoordinate.y) {
@@ -2823,7 +2778,6 @@ void runningToTrap(ghost &ghostCoordinate) {
                     ghostCoordinate.roadToTrap.erase(ghostCoordinate.roadToTrap.begin());
                     ghostCoordinate.d = STOP;
                 }
-
             }
         }
     } else {
@@ -2855,7 +2809,6 @@ void runningToTrap(ghost &ghostCoordinate) {
         case STOP:
             break;
     }
-
 }
 
 void clearAllRoads(ghost &ghostCoordinate) {
@@ -2872,7 +2825,6 @@ void clearAttributesBackToTrap(ghost &ghostCoordinate) {
 }
 
 void clearAttributesRespawnCharacters(ghost &ghostCoordinate) {
-
     ghostCoordinate.d = STOP;
     ghostCoordinate.trapped = true;
     ghostCoordinate.caught = false;
@@ -2881,7 +2833,6 @@ void clearAttributesRespawnCharacters(ghost &ghostCoordinate) {
     ghostCoordinate.readyToLeave = false;
     ghostCoordinate.escaped = false;
     clearAllRoads(ghostCoordinate);
-
 }
 
 void respawnCharacters(ghost &redCoordinate, ghost &yellowCoordinate,
@@ -2889,7 +2840,6 @@ void respawnCharacters(ghost &redCoordinate, ghost &yellowCoordinate,
                        ghost &pinkCoordinate,
                        pacman &pacmanCoordinate, std::vector<CellRoad> &ghostRoad, bool &startGame, int &direction,
                        int &nextDirection, bool &respawn, int &spawnPlace) {
-
     pacmanCoordinate.x = PACMAN_RENDER_X;
     pacmanCoordinate.y = PACMAN_RENDER_Y;
     respawn = true;
@@ -2905,7 +2855,6 @@ void respawnCharacters(ghost &redCoordinate, ghost &yellowCoordinate,
     setGhostsPosition(ghostRoad, BLUE, blueCoordinate);
     clearAttributesRespawnCharacters(blueCoordinate);
     startGame = false;
-
 }
 
 void printLives(pacman &pacmanCoordinate) {
@@ -3126,5 +3075,3 @@ void kill() {
     TTF_Quit();
     SDL_Quit();
 }
-
-
