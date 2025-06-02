@@ -171,7 +171,7 @@ void runningAway(ghost &ghostCoordinate);
 bool
 meetingPacmanWithGhosts(ghost &redCoordinate, ghost &yellowCoordinate, ghost &blueCoordinate, ghost &pinkCoordinate,
                         pacman &pacmanCoordinate, std::vector<CellRoad> &ghostRoad, bool &startGame, int &direction,
-                        int &nextDirection, bool &respawn, int &spawnPlace);
+                        int &nextDirection, bool &respawn, int &spawnPlace, int &maxPoint);
 
 bool
 findFreePlaceInTrap(ghost &ghostCoordinate, std::vector<CellRoad> &ghostRoad, int &spawnPlace, CellRoad &freePlace,
@@ -209,6 +209,7 @@ int main(int argc, char *args[]) {
     if (!load()) return 1;
 
     int TotalScore = 0;
+    int maxPoint = 0;
     int spawnPlace = 3;
     bool startGame = false;
     bool escape = false;
@@ -725,7 +726,6 @@ int main(int argc, char *args[]) {
                                                                       index, red_ghost_coordinate.currentNodeSource,
                                                                       joinedRoad, OTHER);
                 } else {
-                    TotalScore += 1600;
                     red_ghost_coordinate.deleted = true;
                 }
             }
@@ -752,7 +752,6 @@ int main(int argc, char *args[]) {
                                                                        index, pink_ghost_coordinate.currentNodeSource,
                                                                        joinedRoad, OTHER);
                 } else {
-                    TotalScore += 1600;
                     pink_ghost_coordinate.deleted = true;
                 }
             }
@@ -780,7 +779,6 @@ int main(int argc, char *args[]) {
                                                                          yellow_ghost_coordinate.currentNodeSource,
                                                                          joinedRoad, OTHER);
                 } else {
-                    TotalScore += 1600;
                     yellow_ghost_coordinate.deleted = true;
                 }
             }
@@ -808,9 +806,16 @@ int main(int argc, char *args[]) {
                                                                        blue_ghost_coordinate.currentNodeSource,
                                                                        joinedRoad, OTHER);
                 } else {
-                    TotalScore += 1600;
                     blue_ghost_coordinate.deleted = true;
                 }
+            }
+        }
+
+        if (red_ghost_coordinate.deleted || pink_ghost_coordinate.deleted || yellow_ghost_coordinate.deleted ||
+            blue_ghost_coordinate.deleted) {
+            if (!maxPoint) {
+                TotalScore += 1600;
+                maxPoint = 1;
             }
         }
 
@@ -818,8 +823,9 @@ int main(int argc, char *args[]) {
         if (meetingPacmanWithGhosts(red_ghost_coordinate, yellow_ghost_coordinate,
                                     blue_ghost_coordinate,
                                     pink_ghost_coordinate, pacman, ghostRoad, startGame, direction,
-                                    next_direction, respawn, spawnPlace) || pointsCoordinates.empty()) {
+                                    next_direction, respawn, spawnPlace, maxPoint) || pointsCoordinates.empty()) {
             TotalScore = 0;
+            maxPoint = 0;
             pacman.lives = 2;
             respawnCharacters(red_ghost_coordinate, yellow_ghost_coordinate, blue_ghost_coordinate,
                               pink_ghost_coordinate, pacman, ghostRoad, startGame, direction, next_direction, respawn,
@@ -2632,7 +2638,7 @@ void runningAway(ghost &ghostCoordinate) {
 bool
 meetingPacmanWithGhosts(ghost &redCoordinate, ghost &yellowCoordinate, ghost &blueCoordinate, ghost &pinkCoordinate,
                         pacman &pacmanCoordinate, std::vector<CellRoad> &ghostRoad, bool &startGame, int &direction,
-                        int &nextDirection, bool &respawn, int &spawnPlace) {
+                        int &nextDirection, bool &respawn, int &spawnPlace, int &maxPoint) {
     if (pacmanCoordinate.x == redCoordinate.x && pacmanCoordinate.y == redCoordinate.y) {
         if (redCoordinate.dead) {
             redCoordinate.slowingGhost = 0.0f;
@@ -2645,6 +2651,7 @@ meetingPacmanWithGhosts(ghost &redCoordinate, ghost &yellowCoordinate, ghost &bl
                                   blueCoordinate, pinkCoordinate,
                                   pacmanCoordinate, ghostRoad, startGame, direction, nextDirection, respawn,
                                   spawnPlace);
+                maxPoint = 0;
             } else {
                 return true;
             }
@@ -2663,6 +2670,7 @@ meetingPacmanWithGhosts(ghost &redCoordinate, ghost &yellowCoordinate, ghost &bl
                                   blueCoordinate, pinkCoordinate,
                                   pacmanCoordinate, ghostRoad, startGame, direction, nextDirection, respawn,
                                   spawnPlace);
+                maxPoint = 0;
             } else {
                 return true;
             }
@@ -2681,6 +2689,7 @@ meetingPacmanWithGhosts(ghost &redCoordinate, ghost &yellowCoordinate, ghost &bl
                                   blueCoordinate, pinkCoordinate,
                                   pacmanCoordinate, ghostRoad, startGame, direction, nextDirection, respawn,
                                   spawnPlace);
+                maxPoint = 0;
             } else {
                 return true;
             }
@@ -2699,6 +2708,7 @@ meetingPacmanWithGhosts(ghost &redCoordinate, ghost &yellowCoordinate, ghost &bl
                                   blueCoordinate, pinkCoordinate,
                                   pacmanCoordinate, ghostRoad, startGame, direction, nextDirection, respawn,
                                   spawnPlace);
+                maxPoint = 0;
             } else {
                 return true;
             }
