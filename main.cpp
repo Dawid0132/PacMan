@@ -174,7 +174,8 @@ meetingPacmanWithGhosts(ghost &redCoordinate, ghost &yellowCoordinate, ghost &bl
                         int &nextDirection, bool &respawn, int &spawnPlace);
 
 bool
-findFreePlaceInTrap(ghost &ghostCoordinate, std::vector<CellRoad> &ghostRoad, int &spawnPlace, CellRoad &freePlace);
+findFreePlaceInTrap(ghost &ghostCoordinate, std::vector<CellRoad> &ghostRoad, int &spawnPlace, CellRoad &freePlace,
+                    int &total_score);
 
 size_t findSpawnPlace(CellRoad &destination, std::vector<CellRoad> &joinedRoad);
 
@@ -718,12 +719,13 @@ int main(int argc, char *args[]) {
                 runningToTrap(red_ghost_coordinate);
             } else {
                 CellRoad destination = {};
-                if (findFreePlaceInTrap(red_ghost_coordinate, ghostRoad, spawnPlace, destination)) {
+                if (findFreePlaceInTrap(red_ghost_coordinate, ghostRoad, spawnPlace, destination, TotalScore)) {
                     int index = findSpawnPlace(destination, joinedRoad);
                     red_ghost_coordinate.roadToTrap = getShortestPath(joinedNeighboursGraph,
                                                                       index, red_ghost_coordinate.currentNodeSource,
                                                                       joinedRoad, OTHER);
                 } else {
+                    TotalScore += 1600;
                     red_ghost_coordinate.deleted = true;
                 }
             }
@@ -744,12 +746,13 @@ int main(int argc, char *args[]) {
                 runningToTrap(pink_ghost_coordinate);
             } else {
                 CellRoad destination = {};
-                if (findFreePlaceInTrap(pink_ghost_coordinate, ghostRoad, spawnPlace, destination)) {
+                if (findFreePlaceInTrap(pink_ghost_coordinate, ghostRoad, spawnPlace, destination, TotalScore)) {
                     int index = findSpawnPlace(destination, joinedRoad);
                     pink_ghost_coordinate.roadToTrap = getShortestPath(joinedNeighboursGraph,
                                                                        index, pink_ghost_coordinate.currentNodeSource,
                                                                        joinedRoad, OTHER);
                 } else {
+                    TotalScore += 1600;
                     pink_ghost_coordinate.deleted = true;
                 }
             }
@@ -770,13 +773,14 @@ int main(int argc, char *args[]) {
                 runningToTrap(yellow_ghost_coordinate);
             } else {
                 CellRoad destination = {};
-                if (findFreePlaceInTrap(yellow_ghost_coordinate, ghostRoad, spawnPlace, destination)) {
+                if (findFreePlaceInTrap(yellow_ghost_coordinate, ghostRoad, spawnPlace, destination, TotalScore)) {
                     int index = findSpawnPlace(destination, joinedRoad);
                     yellow_ghost_coordinate.roadToTrap = getShortestPath(joinedNeighboursGraph,
                                                                          index,
                                                                          yellow_ghost_coordinate.currentNodeSource,
                                                                          joinedRoad, OTHER);
                 } else {
+                    TotalScore += 1600;
                     yellow_ghost_coordinate.deleted = true;
                 }
             }
@@ -797,13 +801,14 @@ int main(int argc, char *args[]) {
                 runningToTrap(blue_ghost_coordinate);
             } else {
                 CellRoad destination = {};
-                if (findFreePlaceInTrap(blue_ghost_coordinate, ghostRoad, spawnPlace, destination)) {
+                if (findFreePlaceInTrap(blue_ghost_coordinate, ghostRoad, spawnPlace, destination, TotalScore)) {
                     int index = findSpawnPlace(destination, joinedRoad);
                     blue_ghost_coordinate.roadToTrap = getShortestPath(joinedNeighboursGraph,
                                                                        index,
                                                                        blue_ghost_coordinate.currentNodeSource,
                                                                        joinedRoad, OTHER);
                 } else {
+                    TotalScore += 1600;
                     blue_ghost_coordinate.deleted = true;
                 }
             }
@@ -2704,7 +2709,8 @@ meetingPacmanWithGhosts(ghost &redCoordinate, ghost &yellowCoordinate, ghost &bl
 }
 
 bool
-findFreePlaceInTrap(ghost &ghostCoordinate, std::vector<CellRoad> &ghostRoad, int &spawnPlace, CellRoad &freePlace) {
+findFreePlaceInTrap(ghost &ghostCoordinate, std::vector<CellRoad> &ghostRoad, int &spawnPlace, CellRoad &freePlace,
+                    int &total_score) {
     int count = 0;
 
     for (auto road: ghostRoad) {
@@ -2712,18 +2718,21 @@ findFreePlaceInTrap(ghost &ghostCoordinate, std::vector<CellRoad> &ghostRoad, in
             if (count == 1) {
                 freePlace = road;
                 spawnPlace++;
+                total_score += 200;
                 return true;
             }
         } else if (spawnPlace < 2) {
             if (count == 2) {
                 freePlace = road;
                 spawnPlace++;
+                total_score += 400;
                 return true;
             }
         } else if (spawnPlace < 3) {
             if (count == 3) {
                 freePlace = road;
                 spawnPlace++;
+                total_score += 800;
                 return true;
             }
         }
@@ -2832,6 +2841,7 @@ void clearAttributesRespawnCharacters(ghost &ghostCoordinate) {
     ghostCoordinate.readyToEscape = false;
     ghostCoordinate.readyToLeave = false;
     ghostCoordinate.escaped = false;
+    ghostCoordinate.deleted = false;
     clearAllRoads(ghostCoordinate);
 }
 
